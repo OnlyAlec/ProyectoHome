@@ -1,58 +1,127 @@
 import socket
 import json
 import base64
+import threading
+import queue
+import sys
 
-conn = None
+# ----------------------------------
+# Globales
+# ----------------------------------
+conn = socket.socket()
+q = queue.Queue()
 
+
+# ----------------------------------
+# Clases
+# ----------------------------------
+class dataBack:
+    def __init__(self, fn: str, data: dict = {}):
+        self.function = fn
+        self.args = data
+
+    def toJSON(self):
+        jsonFormat = {
+            "function": self.function,
+            "args": self.args,
+        }
+        return json.dumps(jsonFormat)
+
+
+# ----------------------------------
+# Funciones Conectividad
+# ----------------------------------
 def pair():
-    host = '0.0.0.0'  # Escucha en todas las interfaces de red
-    port = 8080
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((host, port))
+    s.bind(('0.0.0.0', 8080))
     s.listen(1)
-    print(f'Listening... {host}: {port}')
+    print(f'Listening all network...')
 
     connection, addr = s.accept()
     print(f'Connection OK!:  {addr}')
+    s.setblocking(False)
     return connection
-
-
-def getData():
-    while True:
-        encodeData = conn.recv(1024)
-        data = base64.b64decode(encodeData)
-        if data:
-            print(f'Data: {encodeData}')
-            return json.loads(data.decode('utf-8'))
 
 
 def sendData(dataSend):
     try:
-        dataSend = json.dumps(dataSend)
+        print("\t▣ Sending data...")
         encodeData = base64.b64encode(dataSend.encode('utf-8'))
         conn.send(encodeData)
+        print("\t▣ Data Send!")
     except OSError as e:
-        print(f"Data Failed Send! ->\t{e}")
+        print(f"\t▣ Data Failed Send! ->\t{e}")
         return None
-    print("Data Send!")
 
 
-def sInfrared(dataSensor):
-    inicio, fin = dataSensor
+# ----------------------------------
+# Funciones por hilos
+# ----------------------------------
+def functionWorker():
+    while True:
+        data = q.get()
+        print(f"\t▣ Redirecting {data}")
+        redirectFunctions(data["type"], data["data"])
+        q.task_done()
+
+
+def getDataWorker():
+    encodeData = b''
+    delimiter = b'\n'
+    while True:
+        chunk = conn.recv(1024)
+        if not chunk:
+            print("No more info!")
+            sys.exit(0)
+        encodeData += chunk
+        posDelimiter = encodeData.find(delimiter)
+        if posDelimiter != -1:
+            encodeData = encodeData[:posDelimiter]
+            print("\t▣ Getting data...")
+            data = base64.b64decode(encodeData)
+
+            print(f'\tData: {encodeData}')
+            data = json.loads(data.decode('utf-8'))
+            q.put(data)
+            encodeData = encodeData[posDelimiter + len(delimiter):]
+
+
+def redirectFunctions(strSensor: str, kwargs: dict = {}):
+    functionsValid = {
+        "Ultrasonico": sInfrared
+    }
+    returnData = functionsValid[strSensor](**kwargs)
+    print(f"\t▣ Return data: {returnData}")
+    if returnData:
+        sendData(returnData)
+
+
+# ----------------------------------
+# Proceso de datos sensores
+# ----------------------------------
+def sInfrared(**kwargs):
+    inicio = kwargs["inicio"]
+    fin = kwargs["fin"]
     duracion = fin - inicio
     distancia = (duracion * 0.0343) / 2
-    print(f'Distancia detectada: {distancia}m')
-    
-    if distancia < 
+    print(f'\t\t◈ Distancia detectada: {distancia}')
+
+    if distancia < 10:
+        return dataBack("openDoor", {"servo": "SERVO_1", "state": "ON"}).toJSON()
+    return dataBack("openDoor", {"servo": "SERVO_1", "state": "OFF"}).toJSON()
 
 
+# ----------------------------------
+# Main
+# ----------------------------------
 if __name__ == '__main__':
+    print("Init program...")
     conn = pair()
-    jsonData = {
-        "type": "infrared",
-        "data": "data"
-    }
-    sendData(jsonData)
-    # while True:
-    #     info = getData()
-    #     sInfrared(info)
+
+    gD = threading.Thread(target=getDataWorker, daemon=True)
+    sD = threading.Thread(target=functionWorker, daemon=True)
+    sD.start()
+    gD.start()
+
+    gD.join()
+    sD.join()

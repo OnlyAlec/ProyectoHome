@@ -7,20 +7,24 @@ from machine import Pin, PWM
 import utime
 import network
 
-
+# ----------------------------------
 # Pin de sensores
+# ----------------------------------
 ECHO = Pin(27, Pin.IN)
 TRIG = Pin(26, Pin.OUT)
 SERVO_1 = Pin(17, Pin.OUT)
-# Variables globales
+
+
+# ----------------------------------
+# Globales
+# ----------------------------------
 server = socket.socket()
 dataSensor = []
+
 
 # ----------------------------------
 # Clases
 # ----------------------------------
-
-
 class Sensor:
     def __init__(self, sensor, data):
         self.sensorName = sensor
@@ -34,45 +38,46 @@ class Sensor:
         }
         return json.dumps(jsonFormat)
 
+
 # ----------------------------------
 # Funciones conectividad
 # ----------------------------------
-
-
 def connectServer():
     print("Connecting...")
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     # wlan.connect('Alec Honor', "DarklinkA")
     wlan.connect('INFINITUM1B29_2.4', "3vq4v7vPsV")
-
     while not wlan.isconnected():
         pass
-
     print('Connect!, IP:', wlan.ifconfig()[0])
+
     print("Connecting to server...")
-    sTmp = socket.socket()
-    sTmp.setblocking(False)
-    host = '192.168.174.38'
-    port = 8080
-    sTmp.connect((host, port))
-    return sTmp
+    try:
+        sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sTmp.connect(('192.168.1.204', 8080))
+        return sTmp
+    except OSError as e:
+        print(e)
+        return None
 
 
 def sendData(dataSend):
     try:
         encodeData = base64.b64encode(dataSend.encode('utf-8'))
-        server.send(encodeData)
+        server.send(encodeData+"\n")
+        print("\t▣ Data Send!")
+        return True
     except OSError as e:
         if e.errno in (9, 104):
             print(f"\t▣ Data Failed Send! ->\t{e}")
-            return False
-    print("\t▣ Data Send!")
+            sys.exit()
 
 
 def reciveData():
     try:
-        if (data := server.recv(1024)) is not None:
+        data = server.recv(1024)
+        if data is not None:
             data = base64.b64decode(data)
             data = json.loads(data)
             print("\t▣ Data Recive!")
@@ -82,15 +87,19 @@ def reciveData():
     except OSError as e:
         if e.errno in (9, 104):
             print(f"\t▣ Data Failed Recive! ->\t{e}")
+            sys.exit()
         return None
 
 
+# ----------------------------------
+# Funciones sensores
+# ----------------------------------
 def sensorUltrasonico():
     inicio = 0
     fin = 0
 
     TRIG.low()
-    utime.sleep_us(2)
+    utime.sleep(0.5)
 
     TRIG.high()
     utime.sleep_us(10)
@@ -105,55 +114,57 @@ def sensorUltrasonico():
     output = Sensor("Ultrasonico", {"inicio": inicio, "fin": fin})
     return output.toJSON()
 
+
 # ----------------------------------
 # Funciones acciones
 # ----------------------------------
-
-
-def openDoor(servo: Pin):
+def openDoor(**kwargs):
+    state = kwargs["state"]
+    servo = globals()[kwargs["servo"]]
     pwmServo = PWM(servo)
     pwmServo.freq(50)
 
-    pwmServo.duty_u16(8000)
-    utime.sleep(2)
-    pwmServo.duty_u16(2000)
+    if state is "ON":
+        pwmServo.duty_u16(8000)
+    else:
+        pwmServo.duty_u16(2000)
     return True
+
+
 # ----------------------------------
 # Funciones por hilos
 # ----------------------------------
+def serverWorker():
+    while True:
+        fn = reciveData()
+        if fn is not None:
+            print(f"\t▣ Action: {fn['function']} -> {fn['args']}")
+            actions(fn["function"], fn["args"])
 
 
-def bridgeServer(data):
-    print(f"\t▣ {data} \n")
-    # Mandar informacion de sensores
-    if len(data) != 0:
+def getData_Send(data: list):
+    while True:
+        result = sensorUltrasonico()
+        data.append(result) if result is not None else None
+        # Los demas datos de otros sensores aqui
+
+        # Manda los datos
         print("\t▣ Sending data...")
         for i, d in enumerate(data):
+            print(f"\t▣ {d}")
             status = sendData(d)
-            print(f"\t▣ {i+1} Sensor: {d.sensor}\nStatus: {status}")
+            d = json.loads(d)
+            print(
+                f"\t ✦ {i+1} Sensor: {d["type"]}\n\t\tStatus: {status}", end="\n\n")
+            utime.sleep(0.2)
         data = []
-    else:
-        print("\t▣ No data to send!")
-
-    # Recibir datos
-    data = reciveData()
-    if data is not None:
-        print("\t▣ Action: ", data["function"])
-        actions(data["function"], data["args"])
 
 
-def getDataSensors(data: list):
-    while True:
-        data.append(sensorUltrasonico())
-        # Los demas datos de otros sensores aqui
-        utime.sleep(0.5)
-
-
-def actions(strFunction: str, args: tuple = ()):
+def actions(strFunction: str, kwargs: dict = {}):
     actionsToDo = {
         "openDoor": openDoor
     }
-    status = actionsToDo[strFunction](*args)
+    status = actionsToDo[strFunction](**kwargs)
     print(f"\t◈ Status Action: {status}")
 
 
@@ -163,5 +174,5 @@ if __name__ == '__main__':
         print("Error in connect server!")
         sys.exit()
 
-    _thread.start_new_thread(bridgeServer, (dataSensor,))
-    getDataSensors(dataSensor)
+    _thread.start_new_thread(serverWorker, ())
+    getData_Send(dataSensor)
