@@ -1,29 +1,124 @@
-import json
+# from time import sleep
+# import machine
+# import time
+# from machine import Pin
 
-jsonData = [
 
-    "{\"data\": {\"inicio\": 928024693, \"fin\": 928024737}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 29, 4, 1]}",
+# class HCSR04:
+#     """
+#     Driver to use the untrasonic sensor HC-SR04.
+#     The sensor range is between 2cm and 4m.
+#     The timeouts received listening to echo pin are converted to OSError('Out of range')
+#     """
+#     # echo_timeout_us is based in chip range limit (400cm)
 
-    "{\"data\": {\"inicio\": 928528413, \"fin\": 928528443}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 29, 4, 1]}",
+#     def __init__(self, trigger_pin, echo_pin, echo_timeout_us=500*2*30):
+#         """
+#         trigger_pin: Output pin to send pulses
+#         echo_pin: Readonly pin to measure the distance. The pin should be protected with 1k resistor
+#         echo_timeout_us: Timeout in microseconds to listen to echo pin.
+#         By default is based in sensor limit range (4m)
+#         """
+#         self.echo_timeout_us = echo_timeout_us
+#         # Init trigger pin (out)
+#         self.trigger = Pin(trigger_pin, mode=Pin.OUT, pull=0)
+#         self.trigger.value(0)
 
-    "{\"data\": {\"inicio\": 929031760, \"fin\": 929031805}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 30, 4, 1]}",
+#         # Init echo pin (in)
+#         self.echo = Pin(echo_pin, mode=Pin.IN, pull=0)
 
-    "{\"data\": {\"inicio\": 929535091, \"fin\": 929535117}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 30, 4, 1]}",
+#     def _send_pulse_and_wait(self):
+#         """
+#         Send the pulse to trigger and listen on echo pin.
+#         We use the method `machine.time_pulse_us()` to get the microseconds until the echo is received.
+#         """
+#         self.trigger.value(0)  # Stabilize the sensor
+#         time.sleep_ms(60)
+#         self.trigger.value(1)
+#         # Send a 10us pulse.
+#         time.sleep_us(10)
+#         self.trigger.value(0)
+#         try:
+#             pulse_time = machine.time_pulse_us(
+#                 self.echo, 1)
+#             return pulse_time
+#         except OSError as ex:
+#             if ex.args[0] == 110:  # 110 = ETIMEDOUT
+#                 raise OSError('Out of range')
+#             raise ex
 
-    "{\"data\": {\"inicio\": 930038363, \"fin\": 930038404}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 31, 4, 1]}",
+#     def distance_mm(self):
+#         """
+#         Get the distance in milimeters without floating point operations.
+#         """
+#         pulse_time = self._send_pulse_and_wait()
 
-    "{\"data\": {\"inicio\": 930541654, \"fin\": 930541697}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 31, 4, 1]}",
+#         # To calculate the distance we get the pulse_time and divide it by 2
+#         # (the pulse walk the distance twice) and by 29.1 becasue
+#         # the sound speed on air (343.2 m/s), that It's equivalent to
+#         # 0.34320 mm/us that is 1mm each 2.91us
+#         # pulse_time // 2 // 2.91 -> pulse_time // 5.82 -> pulse_time * 100 // 582
+#         mm = pulse_time * 100 // 582
+#         return mm
 
-    "{\"data\": {\"inicio\": 931045128, \"fin\": 931045172}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 32, 4, 1]}",
+#     def distance_cm(self):
+#         """
+#         Get the distance in centimeters with floating point operations.
+#         It returns a float
+#         """
+#         pulse_time = self._send_pulse_and_wait()
 
-    "{\"data\": {\"inicio\": 931548503, \"fin\": 931548547}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 32, 4, 1]}",
+#         # To calculate the distance we get the pulse_time and divide it by 2
+#         # (the pulse walk the distance twice) and by 29.1 becasue
+#         # the sound speed on air (343.2 m/s), that It's equivalent to
+#         # 0.034320 cm/us that is 1cm each 29.1us
+#         cms = (pulse_time / 2) / 29.1
+#         return cms
 
-    "{\"data\": {\"inicio\": 932051803, \"fin\": 932051849}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 33, 4, 1]}",
 
-    "{\"data\": {\"inicio\": 932555109, \"fin\": 932555153}, \"type\": \"Ultrasonico\", \"time\": [2021, 1, 1, 0, 15, 33, 4, 1]}"
+# if __name__ == "__main__":
+#     sensor = HCSR04(trigger_pin=4, echo_pin=3, echo_timeout_us=10000)
 
-]
+#     while True:
+#         distance = sensor.distance_cm()
+#         print('Distance:', distance, 'cm')
+#         sleep(1)
+from machine import Pin, PWM
+import utime
 
-for i, d in enumerate(jsonData):
-    d = json.loads(d)
-    print(d)
+LED_BICOLOR = (Pin(14, Pin.OUT), Pin(15, Pin.OUT))
+IR = Pin(2, Pin.IN)
+
+
+def test(state):
+    pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
+    pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
+    pwmLed1.duty_u16(0)
+    pwmLed2.duty_u16(0)
+
+    if state is "ON":
+        pwmLed2.duty_u16(0)
+        for i in range(100):
+            pwmLed1.duty_u16(100*i)
+            utime.sleep(0.01)
+        for i in range(100):
+            pwmLed1.duty_u16(100*(100-i))
+            utime.sleep(0.01)
+    else:
+        pwmLed1.duty_u16(0)
+        for i in range(100):
+            pwmLed2.duty_u16(100*i)
+            utime.sleep(0.01)
+        for i in range(100):
+            pwmLed2.duty_u16(100*(100-i))
+            utime.sleep(0.01)
+
+
+if __name__ == '__main__':
+    while True:
+        if IR.value():
+            print("OFF")
+            test("OFF")
+        else:
+            print("ON")
+            test("ON")

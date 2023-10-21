@@ -78,17 +78,19 @@ def getDataWorker():
         if posDelimiter != -1:
             encodeData = encodeData[:posDelimiter]
             print("\t▣ Getting data...")
-            data = base64.b64decode(encodeData)
-
-            print(f'\tData: {encodeData}')
-            data = json.loads(data.decode('utf-8'))
-            q.put(data)
-            encodeData = encodeData[posDelimiter + len(delimiter):]
+            try:
+                data = base64.b64decode(encodeData)
+                data = json.loads(data.decode('utf-8'))
+                q.put(data)
+                encodeData = encodeData[posDelimiter + len(delimiter):]
+            except Exception as e:
+                print(f"\t▣ Data Failed Recive! ->\t{e}: {e.args}")
 
 
 def redirectFunctions(strSensor: str, kwargs: dict = {}):
     functionsValid = {
-        "Ultrasonico": sInfrared
+        "Ultrasonico": sInfrared,
+        "IR": sIR,
     }
     returnData = functionsValid[strSensor](**kwargs)
     print(f"\t▣ Return data: {returnData}")
@@ -100,15 +102,24 @@ def redirectFunctions(strSensor: str, kwargs: dict = {}):
 # Proceso de datos sensores
 # ----------------------------------
 def sInfrared(**kwargs):
-    inicio = kwargs["inicio"]
-    fin = kwargs["fin"]
-    duracion = fin - inicio
-    distancia = (duracion * 0.0343) / 2
-    print(f'\t\t◈ Distancia detectada: {distancia}')
+    pulse_time = kwargs["pulse"]
+    cms = (pulse_time / 2) / 29.1
+    # inicio = kwargs["inicio"]
+    # fin = kwargs["fin"]
+    # duracion = fin - inicio
+    # distancia = (duracion * 0.0343) / 2
+    print(f'\t\t◈  Distancia detectada: {cms}')
 
-    if distancia < 10:
+    if cms < 10:
         return dataBack("openDoor", {"servo": "SERVO_1", "state": "ON"}).toJSON()
     return dataBack("openDoor", {"servo": "SERVO_1", "state": "OFF"}).toJSON()
+
+
+def sIR(**kwargs):
+    status = kwargs["status"]
+    if status == "True":
+        return dataBack("ledChange", {"led": "LED_1", "state": "ON"}).toJSON()
+    return dataBack("ledChange", {"led": "LED_1", "state": "OFF"}).toJSON()
 
 
 # ----------------------------------

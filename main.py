@@ -6,20 +6,23 @@ import _thread
 from machine import Pin, PWM
 import utime
 import network
+# from mfrc522 import MFRC522
 
 # ----------------------------------
 # Pin de sensores
 # ----------------------------------
-ECHO = Pin(27, Pin.IN)
-TRIG = Pin(26, Pin.OUT)
-SERVO_1 = Pin(17, Pin.OUT)
+ECHO = Pin(3, Pin.IN)
+TRIG = Pin(4, Pin.OUT)
+IR = Pin(2, Pin.IN)
+# READER = MFRC522(spi_id=21, sck=20, miso=18, mosi=19, cs=17, rst=16)
+SERVO_1 = Pin(22, Pin.OUT)
+LED_1 = Pin(15, Pin.OUT)
 
 
 # ----------------------------------
 # Globales
 # ----------------------------------
 server = socket.socket()
-dataSensor = []
 
 
 # ----------------------------------
@@ -56,6 +59,7 @@ def connectServer():
     try:
         sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sTmp.connect(('192.168.1.204', 8080))
+        # sTmp.connect(('192.168.174.38', 8080))
         return sTmp
     except OSError as e:
         print(e)
@@ -71,6 +75,7 @@ def sendData(dataSend):
     except OSError as e:
         if e.errno in (9, 104):
             print(f"\t▣ Data Failed Send! ->\t{e}")
+
             sys.exit()
 
 
@@ -99,7 +104,7 @@ def sensorUltrasonico():
     fin = 0
 
     TRIG.low()
-    utime.sleep(0.5)
+    utime.sleep_us(2)
 
     TRIG.high()
     utime.sleep_us(10)
@@ -112,6 +117,12 @@ def sensorUltrasonico():
         fin = utime.ticks_us()
 
     output = Sensor("Ultrasonico", {"inicio": inicio, "fin": fin})
+    return output.toJSON()
+
+
+def sensorIR():
+    IRValue: str = "False" if IR.value() == 1 else "True"
+    output = Sensor("IR", {"status": IRValue})
     return output.toJSON()
 
 
@@ -131,9 +142,23 @@ def openDoor(**kwargs):
     return True
 
 
+def ledChange(**kwargs):
+    state = kwargs["state"]
+    led = globals()[kwargs["led"]]
+
+    if state is "ON" and led.value() is 0:
+        led.on()
+        return True
+    if state is "OFF" and led.value() is 1:
+        led.off()
+        return True
+    return False
+
 # ----------------------------------
 # Funciones por hilos
 # ----------------------------------
+
+
 def serverWorker():
     while True:
         fn = reciveData()
@@ -142,16 +167,16 @@ def serverWorker():
             actions(fn["function"], fn["args"])
 
 
-def getData_Send(data: list):
+def getData_Send():
+    data = []
     while True:
-        result = sensorUltrasonico()
-        data.append(result) if result is not None else None
+        # result = sensorUltrasonico()
+        result = sensorIR()
         # Los demas datos de otros sensores aqui
+        data.append(result) if result is not None else None
 
         # Manda los datos
-        print("\t▣ Sending data...")
         for i, d in enumerate(data):
-            print(f"\t▣ {d}")
             status = sendData(d)
             d = json.loads(d)
             print(
@@ -162,10 +187,11 @@ def getData_Send(data: list):
 
 def actions(strFunction: str, kwargs: dict = {}):
     actionsToDo = {
-        "openDoor": openDoor
+        "openDoor": openDoor,
+        "ledChange": ledChange
     }
     status = actionsToDo[strFunction](**kwargs)
-    print(f"\t◈ Status Action: {status}")
+    print(f"\t\t ✩ Status Action: {status}")
 
 
 if __name__ == '__main__':
@@ -175,4 +201,4 @@ if __name__ == '__main__':
         sys.exit()
 
     _thread.start_new_thread(serverWorker, ())
-    getData_Send(dataSensor)
+    getData_Send()
