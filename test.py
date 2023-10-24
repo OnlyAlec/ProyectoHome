@@ -90,35 +90,35 @@ LED_BICOLOR = (Pin(14, Pin.OUT), Pin(15, Pin.OUT))
 IR = Pin(2, Pin.IN)
 
 
-def test(state):
-    pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
-    pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
-    pwmLed1.duty_u16(0)
-    pwmLed2.duty_u16(0)
+def test(mode=0):
+    # pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
+    # pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
+    # pwmLed1.duty_u16(0)
+    # pwmLed2.duty_u16(0)
 
-    if state is "ON":
-        pwmLed2.duty_u16(0)
-        for i in range(100):
-            pwmLed1.duty_u16(100*i)
-            utime.sleep(0.01)
-        for i in range(100):
-            pwmLed1.duty_u16(100*(100-i))
-            utime.sleep(0.01)
-    else:
-        pwmLed1.duty_u16(0)
-        for i in range(100):
-            pwmLed2.duty_u16(100*i)
-            utime.sleep(0.01)
-        for i in range(100):
-            pwmLed2.duty_u16(100*(100-i))
-            utime.sleep(0.01)
+    # if state is "ON":
+    #     pwmLed2.duty_u16(0)
+    #     for i in range(100):
+    #         pwmLed1.duty_u16(100*i)
+    #         utime.sleep(0.01)
+    #     for i in range(100):
+    #         pwmLed1.duty_u16(100*(100-i))
+    #         utime.sleep(0.01)
+    # else:
+    #     pwmLed1.duty_u16(0)
+    #     for i in range(100):
+    #         pwmLed2.duty_u16(100*i)
+    #         utime.sleep(0.01)
+    #     for i in range(100):
+    #         pwmLed2.duty_u16(100*(100-i))
+    #         utime.sleep(0.01)
+    pwmLed = PWM(LED_BICOLOR[mode], freq=50)
+    pwmLed.duty_u16(100)
 
 
 if __name__ == '__main__':
     while True:
-        if IR.value():
-            print("OFF")
-            test("OFF")
-        else:
-            print("ON")
-            test("ON")
+        test(0)
+        utime.sleep(5)
+        test(1)
+        utime.sleep(5)

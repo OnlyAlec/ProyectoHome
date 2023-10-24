@@ -17,6 +17,7 @@ IR = Pin(2, Pin.IN)
 # READER = MFRC522(spi_id=21, sck=20, miso=18, mosi=19, cs=17, rst=16)
 SERVO_1 = Pin(22, Pin.OUT)
 LED_1 = Pin(15, Pin.OUT)
+LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))
 
 
 # ----------------------------------
@@ -46,23 +47,32 @@ class Sensor:
 # Funciones conectividad
 # ----------------------------------
 def connectServer():
+    timeoutConnect = 0
     print("Connecting...")
+    _thread.start_new_thread(initStatusLED, ())
+
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    # wlan.connect('Alec Honor', "DarklinkA")
-    wlan.connect('INFINITUM1B29_2.4', "3vq4v7vPsV")
+    wlan.connect('RPI_Home', "Home@IoT")
     while not wlan.isconnected():
-        pass
-    print('Connect!, IP:', wlan.ifconfig()[0])
+        timeoutConnect += 1
+        utime.sleep(1)
+        if timeoutConnect >= 30:
+            raise TimeoutError
 
+    _thread.exit()
+    print('Connect!, IP:', wlan.ifconfig()[0])
     print("Connecting to server...")
+    _thread.start_new_thread(initStatusLED, (3,))
+
     try:
         sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sTmp.connect(('192.168.1.204', 8080))
-        # sTmp.connect(('192.168.174.38', 8080))
+        sTmp.connect(('200.10.0.6', 8080))
+        _thread.exit()
+        _thread.start_new_thread(initStatusLED, (1,))
         return sTmp
-    except OSError as e:
-        print(e)
+    except OSError as err:
+        print(err)
         return None
 
 
@@ -72,9 +82,9 @@ def sendData(dataSend):
         server.send(encodeData+"\n")
         print("\t▣ Data Send!")
         return True
-    except OSError as e:
-        if e.errno in (9, 104):
-            print(f"\t▣ Data Failed Send! ->\t{e}")
+    except OSError as err:
+        if err.errno in (9, 104):
+            print(f"\t▣ Data Failed Send! ->\t{err}")
 
             sys.exit()
 
@@ -89,9 +99,9 @@ def reciveData():
             return data
         print("\t▣ Data is None!")
         return None
-    except OSError as e:
-        if e.errno in (9, 104):
-            print(f"\t▣ Data Failed Recive! ->\t{e}")
+    except OSError as err:
+        if err.errno in (9, 104):
+            print(f"\t▣ Data Failed Recive! ->\t{err}")
             sys.exit()
         return None
 
@@ -185,7 +195,7 @@ def getData_Send():
         data = []
 
 
-def actions(strFunction: str, kwargs: dict = {}):
+def actions(strFunction: str, kwargs: dict):
     actionsToDo = {
         "openDoor": openDoor,
         "ledChange": ledChange
@@ -194,10 +204,39 @@ def actions(strFunction: str, kwargs: dict = {}):
     print(f"\t\t ✩ Status Action: {status}")
 
 
+def initStatusLED(mode: int = 0):
+    if mode != 3:
+        pwmLed = PWM(LED_BICOLOR[mode], freq=50)
+        while True:
+            for i in range(100):
+                pwmLed.duty_u16(100*i)
+                utime.sleep(0.01)
+            for i in range(100):
+                pwmLed.duty_u16(100*(100-i))
+                utime.sleep(0.01)
+    else:
+        pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
+        pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
+        while True:
+            for i in range(100):
+                pwmLed1.duty_u16(100*i)
+                pwmLed2.duty_u16(100*i)
+                utime.sleep(0.01)
+            for i in range(100):
+                pwmLed1.duty_u16(100*(100-i))
+                pwmLed2.duty_u16(100*(100-i))
+                utime.sleep(0.01)
+
+
 if __name__ == '__main__':
     print("Init program...")
-    if (server := connectServer()) is None:
-        print("Error in connect server!")
+    try:
+        server = connectServer()
+        utime.sleep(2)
+        _thread.exit()
+        LED_BICOLOR[1].on()
+    except (TimeoutError, OSError) as e:
+        print("Error! -> ", e)
         sys.exit()
 
     _thread.start_new_thread(serverWorker, ())
