@@ -79,10 +79,10 @@ def sendData(dataSend):
         print("\t▣ Data Send!")
         return True
     except OSError as err:
+        print(f"\t▣ Data Failed Send! ->\t{err}")
         if err.errno in (9, 104):
-            print(f"\t▣ Data Failed Send! ->\t{err}")
-
             sys.exit()
+        return False
 
 
 def reciveData():

@@ -5,13 +5,11 @@ import threading
 import queue
 import sys
 from datetime import datetime
-from dotenv import load_dotenv
 
 
 # ----------------------------------
 # Globales
 # ----------------------------------
-load_dotenv()
 conn = socket.socket()
 connRPI = socket.socket()
 q = queue.Queue()
@@ -38,7 +36,7 @@ class dataSensor:
 
     def setServer(self, data: dict, tP: datetime):
         self.dataServer = data
-        self.timeProcess = tP.isoformat()
+        self.timeProcess = tP.strftime("%Y-%m-%dT%H:%M:%S")
 
     def toServerJSON(self):
         dictFormat = {
