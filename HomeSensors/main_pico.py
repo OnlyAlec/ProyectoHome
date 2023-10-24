@@ -3,7 +3,7 @@ import socket
 import json
 import base64
 import _thread
-from machine import Pin, PWM
+from machine import Pin, PWM, ADC
 import utime
 import network
 # from mfrc522 import MFRC522
@@ -18,6 +18,7 @@ IR = Pin(2, Pin.IN)
 SERVO_1 = Pin(22, Pin.OUT)
 LED_1 = Pin(15, Pin.OUT)
 LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))
+TEMP = ADC(26)
 
 
 # ----------------------------------
@@ -38,7 +39,7 @@ class Sensor:
         jsonFormat = {
             "type": self.sensorName,
             "data": self.data,
-            "time": utime.localtime()
+            "time": utime.gmtime()
         }
         return json.dumps(jsonFormat)
 
@@ -47,33 +48,28 @@ class Sensor:
 # Funciones conectividad
 # ----------------------------------
 def connectServer():
-    timeoutConnect = 0
-    print("Connecting...")
-    _thread.start_new_thread(initStatusLED, ())
+    print("Connecting...", end=" ")
 
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect('RPI_Home', "Home@IoT")
-    while not wlan.isconnected():
-        timeoutConnect += 1
-        utime.sleep(1)
-        if timeoutConnect >= 30:
-            raise TimeoutError
-
-    _thread.exit()
-    print('Connect!, IP:', wlan.ifconfig()[0])
-    print("Connecting to server...")
-    _thread.start_new_thread(initStatusLED, (3,))
-
     try:
-        sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sTmp.connect(('200.10.0.6', 8080))
-        _thread.exit()
-        _thread.start_new_thread(initStatusLED, (1,))
-        return sTmp
+        initStatusLED(wlan)
     except OSError as err:
-        print(err)
-        return None
+        print("\tFailed! -> ", err)
+        sys.exit()
+
+    print('\tOK! -> IP:', wlan.ifconfig()[0])
+    print("Connecting to server...", end=" ")
+
+    sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sTmp.connect(('200.10.0.6', 8080))
+        print("\tOK!")
+    except OSError as err:
+        print("\tFailed! -> ", err)
+        sys.exit()
+    return sTmp
 
 
 def sendData(dataSend):
@@ -136,6 +132,13 @@ def sensorIR():
     return output.toJSON()
 
 
+def sensorTemp():
+    valueAnalog = TEMP.read_u16()
+    output = Sensor("Temperatura", {"valueAnalog": valueAnalog})
+    utime.sleep(2)
+    return output.toJSON()
+
+
 # ----------------------------------
 # Funciones acciones
 # ----------------------------------
@@ -156,21 +159,21 @@ def ledChange(**kwargs):
     state = kwargs["state"]
     led = globals()[kwargs["led"]]
 
-    if state is "ON" and led.value() is 0:
+    if state == "ON" and led.value() is 0:
         led.on()
         return True
-    if state is "OFF" and led.value() is 1:
+    if state == "OFF" and led.value() is 1:
         led.off()
         return True
     return False
 
+
 # ----------------------------------
 # Funciones por hilos
 # ----------------------------------
-
-
 def serverWorker():
     while True:
+        initStatusLED(None, 1)
         fn = reciveData()
         if fn is not None:
             print(f"\t▣ Action: {fn['function']} -> {fn['args']}")
@@ -204,38 +207,43 @@ def actions(strFunction: str, kwargs: dict):
     print(f"\t\t ✩ Status Action: {status}")
 
 
-def initStatusLED(mode: int = 0):
-    if mode != 3:
-        pwmLed = PWM(LED_BICOLOR[mode], freq=50)
-        while True:
+def initStatusLED(wlan, mode: int = 0):
+    timeoutConnect = 0
+    pwmLed = PWM(LED_BICOLOR[mode], freq=50)
+    if mode == 0:
+        while not wlan.isconnected():
+            timeoutConnect += 1
+            if timeoutConnect > 30:
+                raise OSError("Timeout connect!")
             for i in range(100):
                 pwmLed.duty_u16(100*i)
                 utime.sleep(0.01)
             for i in range(100):
                 pwmLed.duty_u16(100*(100-i))
                 utime.sleep(0.01)
+        pwmLed.deinit()
+        LED_BICOLOR[0].init(mode=Pin.OUT)
+        LED_BICOLOR[0].value(1)
+        LED_BICOLOR[1].value(1)
     else:
-        pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
-        pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
-        while True:
-            for i in range(100):
-                pwmLed1.duty_u16(100*i)
-                pwmLed2.duty_u16(100*i)
-                utime.sleep(0.01)
-            for i in range(100):
-                pwmLed1.duty_u16(100*(100-i))
-                pwmLed2.duty_u16(100*(100-i))
-                utime.sleep(0.01)
+        for i in range(100):
+            pwmLed.duty_u16(100*i)
+            utime.sleep(0.01)
+        for i in range(100):
+            pwmLed.duty_u16(100*(100-i))
+            utime.sleep(0.01)
 
 
 if __name__ == '__main__':
     print("Init program...")
+    LED_BICOLOR[1].value(0)
+    LED_BICOLOR[0].value(0)
     try:
         server = connectServer()
         utime.sleep(2)
-        _thread.exit()
-        LED_BICOLOR[1].on()
-    except (TimeoutError, OSError) as e:
+        LED_BICOLOR[1].value(1)
+        LED_BICOLOR[0].value(0)
+    except (OSError) as e:
         print("Error! -> ", e)
         sys.exit()
 

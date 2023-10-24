@@ -86,39 +86,28 @@
 from machine import Pin, PWM
 import utime
 
-LED_BICOLOR = (Pin(14, Pin.OUT), Pin(15, Pin.OUT))
-IR = Pin(2, Pin.IN)
-
-
-def test(mode=0):
-    # pwmLed1 = PWM(LED_BICOLOR[0], freq=50)
-    # pwmLed2 = PWM(LED_BICOLOR[1], freq=50)
-    # pwmLed1.duty_u16(0)
-    # pwmLed2.duty_u16(0)
-
-    # if state is "ON":
-    #     pwmLed2.duty_u16(0)
-    #     for i in range(100):
-    #         pwmLed1.duty_u16(100*i)
-    #         utime.sleep(0.01)
-    #     for i in range(100):
-    #         pwmLed1.duty_u16(100*(100-i))
-    #         utime.sleep(0.01)
-    # else:
-    #     pwmLed1.duty_u16(0)
-    #     for i in range(100):
-    #         pwmLed2.duty_u16(100*i)
-    #         utime.sleep(0.01)
-    #     for i in range(100):
-    #         pwmLed2.duty_u16(100*(100-i))
-    #         utime.sleep(0.01)
-    pwmLed = PWM(LED_BICOLOR[mode], freq=50)
-    pwmLed.duty_u16(100)
+LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))
 
 
 if __name__ == '__main__':
-    while True:
-        test(0)
-        utime.sleep(5)
-        test(1)
-        utime.sleep(5)
+    LED_BICOLOR[0].value(0)
+    LED_BICOLOR[1].value(0)
+
+    pwmLed = PWM(LED_BICOLOR[0], freq=50)
+    startTime = utime.ticks_ms()
+    while utime.ticks_diff(utime.ticks_ms(), startTime) < 2000:
+        for i in range(100):
+            pwmLed.duty_u16(100*i)
+            utime.sleep(0.01)
+        for i in range(100):
+            pwmLed.duty_u16(100*(100-i))
+            utime.sleep(0.01)
+    pwmLed.deinit()
+    LED_BICOLOR[0].init(mode=Pin.OUT)
+    LED_BICOLOR[0].value(1)
+    LED_BICOLOR[1].value(0)
+    utime.sleep(5)
+    LED_BICOLOR[0].value(0)
+
+    LED_BICOLOR[0].value(0)
+    LED_BICOLOR[1].value(0)
