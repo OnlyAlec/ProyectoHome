@@ -38,10 +38,8 @@ def sendNoSQL(sensor: str, data: dict, tR: str, tP: str):
     initialize_app(cred, {
         'databaseURL': os.getenv('URL_FIREBASE')
     })
-    ref = db.reference('Registros_temp/')
-    ref.child(tP).set({
-        'temperatura': data
-    })
+    ref = db.reference(f'Registros_{sensor}')
+    ref.child(tP).set(data)
     print("Data send to server!")
 
 

@@ -1,17 +1,16 @@
-import socket
 import json
 import base64
 import threading
 import queue
 import sys
 from datetime import datetime
+from rpiListener import initConectivity, listenerWorker
 
 
 # ----------------------------------
 # Globales
 # ----------------------------------
-conn = socket.socket()
-connRPI = socket.socket()
+
 q = queue.Queue()
 
 
@@ -53,50 +52,11 @@ class dataSensor:
             "args": self.args,
         }
         return json.dumps(jsonFormat)
+
+
 # ----------------------------------
 # Funciones Conectividad
 # ----------------------------------
-
-
-def connect():
-    print("Connecting to RPI...", end=" ")
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect(('200.10.0.1', 2050))
-        print("\tOK!")
-    except OSError as e:
-        print(f"\tFAILED ->\t{e}!")
-    return s
-
-
-def pair():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('0.0.0.0', 8080))
-    s.listen(1)
-    print('Listening for PICO...', end=" ")
-
-    connection, addr = s.accept()
-    print(f'\tOK!:  {addr}')
-    s.setblocking(False)
-    return connection
-
-
-def sendData(data: dataSensor):
-    if data.fn is not None:
-        try:
-            print("\t▣ Sending function...", end=" ")
-            encodeData = base64.b64encode(data.toJSON().encode('utf-8'))
-            conn.send(encodeData)
-            print("\tOK!")
-        except OSError as e:
-            print(f"\tFAILED ->\t{e}!")
-
-    try:
-        print("\t▣ Sending data to server...", end=" ")
-        connRPI.send(data.toServerJSON().encode('utf-8'))
-        print("\tOK!")
-    except OSError as e:
-        print(f"\tFAILED ->\t{e}!")
 
 
 # ----------------------------------
@@ -178,13 +138,12 @@ def sTemp(**kwargs):
 # ----------------------------------
 if __name__ == '__main__':
     print("Init program...")
-    conn = pair()
-    connRPI = connect()
+    conn = initConectivity()
+    listenerWorker(q)
+    # gD = threading.Thread(target=listenerWorker(q), daemon=True)
+    # sD = threading.Thread(target=functionWorker, daemon=True)
+    # sD.start()
+    # gD.start()
 
-    gD = threading.Thread(target=getDataWorker, daemon=True)
-    sD = threading.Thread(target=functionWorker, daemon=True)
-    sD.start()
-    gD.start()
-
-    gD.join()
-    sD.join()
+    # gD.join()
+    # sD.join()
