@@ -3,8 +3,10 @@ import socket
 import threading
 import queue
 import json
+from dotenv import load_dotenv
 from firebase_admin import db, credentials, initialize_app
 
+load_dotenv()
 conn = socket.socket()
 q = queue.Queue()
 
@@ -33,25 +35,28 @@ def getDataWorker():
             print(f"\tFAILED! ->\t{e}: {e.args}")
 
 
+def initFirebase():
+    cred = credentials.Certificate('./Auth/firebase.json')
+    initialize_app(cred, {'databaseURL': os.getenv('URL_FIREBASE')})
+
+
 def sendNoSQL(sensor: str, data: dict, tR: str, tP: str):
-    cred = credentials.Certificate('./.env/firebase.json')
-    initialize_app(cred, {
-        'databaseURL': os.getenv('URL_FIREBASE')
-    })
-    ref = db.reference(f'Registros_{sensor}')
-    ref.child(tP).set(data)
+    ref = db.reference(sensor)
+    ref.child(tR).set(
+        {"data": data, "timeProcess": tP})
     print("Data send to server!")
 
 
 if __name__ == '__main__':
     print("Init Center RPI..")
     conn = pair()
+    initFirebase()
 
     gD = threading.Thread(target=getDataWorker, daemon=True)
     gD.start()
 
     while True:
         d: dict = q.get()
-        print(d)
+        print("\n", d)
         sendNoSQL(d["sensor"], d["data"], d["timeRecived"], d["timeProcess"])
         q.task_done()
