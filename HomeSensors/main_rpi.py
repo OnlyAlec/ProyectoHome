@@ -1,22 +1,22 @@
 import json
-import base64
 import threading
 import queue
-import sys
 from datetime import datetime
-from rpiListener import initConectivity, listenerWorker
+import libConnect
 
 
 # ----------------------------------
 # Globales
 # ----------------------------------
-
 q = queue.Queue()
-
+connPICO = None
+connRPI = None
 
 # ----------------------------------
 # Clases
 # ----------------------------------
+
+
 class dataSensor:
     def __init__(self, typeSensor: str, data: dict, tR: list):
         self.type = typeSensor
@@ -57,12 +57,16 @@ class dataSensor:
 # ----------------------------------
 # Funciones Conectividad
 # ----------------------------------
+def sendData(pico: libConnect.Connection, rpi: libConnect.Connection, dataS: dataSensor):
+    if dataS.fn:
+        libConnect.senderWorker(pico, dataS)
+    libConnect.senderWorker(rpi, dataS)
 
 
 # ----------------------------------
 # Funciones por hilos
 # ----------------------------------
-def functionWorker():
+def functionWorker(cPICO, cRPI):
     fnValid = {
         "Ultrasonico": sInfrared,
         "IR": sIR,
@@ -70,35 +74,13 @@ def functionWorker():
     }
     while True:
         data = q.get()
-        dataS = dataSensor(data["type"], data["data"], data["time"])
-        fn, args, server = fnValid[dataS.type](**dataS.dataRecived)
-        dataS.setFn(fn, args)
-        dataS.setServer(server, datetime.now())
-        sendData(dataS)
-        q.task_done()
-
-
-def getDataWorker():
-    encodeData = b''
-    delimiter = b'\n'
-    while True:
-        chunk = conn.recv(1024)
-        if not chunk:
-            print("Server disconnected!")
-            sys.exit(0)
-        encodeData += chunk
-        posDelimiter = encodeData.find(delimiter)
-        if posDelimiter != -1:
-            encodeData = encodeData[:posDelimiter]
-            print("\t▣ Getting data...", end=" ")
-            try:
-                data = base64.b64decode(encodeData)
-                data = json.loads(data.decode('utf-8'))
-                q.put(data)
-                encodeData = encodeData[posDelimiter + len(delimiter):]
-                print("\tOK!")
-            except Exception as e:
-                print(f"\tFAILED! ->\t{e}: {e.args}")
+        if data:
+            dataS = dataSensor(data["type"], data["data"], data["time"])
+            fn, args, server = fnValid[dataS.type](**dataS.dataRecived)
+            dataS.setFn(fn, args)
+            dataS.setServer(server, datetime.now())
+            sendData(cPICO, cRPI, dataS)
+            q.task_done()
 
 
 # ----------------------------------
@@ -138,12 +120,14 @@ def sTemp(**kwargs):
 # ----------------------------------
 if __name__ == '__main__':
     print("Init program...")
-    conn = initConectivity()
-    listenerWorker(q)
-    # gD = threading.Thread(target=listenerWorker(q), daemon=True)
-    # sD = threading.Thread(target=functionWorker, daemon=True)
-    # sD.start()
-    # gD.start()
+    connPICO = libConnect.initConnectPico()
+    # connRPI = libConnect.initConnectRPI(host="192.168.68.104", port=8080)
 
-    # gD.join()
-    # sD.join()
+    gD = threading.Thread(target=libConnect.listenerWorker(q), daemon=True)
+    sD = threading.Thread(target=functionWorker(
+        connPICO, connRPI), daemon=True)
+    sD.start()
+    gD.start()
+
+    gD.join()
+    sD.join()

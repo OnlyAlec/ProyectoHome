@@ -1,19 +1,18 @@
 import sys
 import socket
-import json
-import base64
 import _thread
 from machine import Pin, PWM, ADC
 import utime
 import network
 # from mfrc522 import MFRC522
+import libConnectPico
 
 # ----------------------------------
 # Pin de sensores
 # ----------------------------------
 ECHO = Pin(3, Pin.IN)
 TRIG = Pin(4, Pin.OUT)
-IR = Pin(2, Pin.IN)
+IR = Pin(28, Pin.IN)
 # READER = MFRC522(spi_id=21, sck=20, miso=18, mosi=19, cs=17, rst=16)
 SERVO_1 = Pin(22, Pin.OUT)
 LED_1 = Pin(15, Pin.OUT)
@@ -25,8 +24,6 @@ TEMP = ADC(26)
 # Globales
 # ----------------------------------
 server = socket.socket()
-host = "200.10.0.6"
-port = 8080
 
 
 # ----------------------------------
@@ -37,71 +34,27 @@ class Sensor:
         self.sensorName = sensor
         self.data = dict(data)
 
-    def toJSON(self):
-        jsonFormat = {
-            "type": self.sensorName,
-            "data": self.data,
-            "time": utime.gmtime()
-        }
-        return json.dumps(jsonFormat)
-
 
 # ----------------------------------
 # Funciones conectividad
 # ----------------------------------
-# def connectServer():
-#     print("Connecting...", end=" ")
+def connectServer(host, port):
+    print("Connecting...", end=" ")
 
-#     wlan = network.WLAN(network.STA_IF)
-#     wlan.active(True)
-#     wlan.connect('RPI_Home', "Home@IoT")
-#     try:
-#         initStatusLED(wlan)
-#     except OSError as err:
-#         print("\tFailed! -> ", err)
-#         sys.exit()
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    # wlan.connect('RPI_Home', "Home@IoT")
+    wlan.connect('Macuco', "DOMINGO.2022")
+    try:
+        initStatusLED(wlan)
+    except OSError as err:
+        print("\tFailed! -> ", err)
+        sys.exit()
 
-#     print('\tOK! -> IP:', wlan.ifconfig()[0])
-#     print("Connecting to server...", end=" ")
+    print('\tOK! -> IP:', wlan.ifconfig()[0])
 
-#     sTmp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     try:
-#         sTmp.connect(('200.10.0.6', 8080))
-#         print("\tOK!")
-#     except OSError as err:
-#         print("\tFailed! -> ", err)
-#         sys.exit()
-#     return sTmp
-
-
-# def sendData(dataSend):
-#     try:
-#         encodeData = base64.b64encode(dataSend.encode('utf-8'))
-#         server.send(encodeData+"\n")
-#         print("\t▣ Data Send!")
-#         return True
-#     except OSError as err:
-#         print(f"\t▣ Data Failed Send! ->\t{err}")
-#         if err.errno in (9, 104):
-#             sys.exit()
-#         return False
-
-
-# def reciveData():
-#     try:
-#         data = server.recv(1024)
-#         if data is not None:
-#             data = base64.b64decode(data)
-#             data = json.loads(data)
-#             print("\t▣ Data Recive!")
-#             return data
-#         print("\t▣ Data is None!")
-#         return None
-#     except OSError as err:
-#         if err.errno in (9, 104):
-#             print(f"\t▣ Data Failed Recive! ->\t{err}")
-#             sys.exit()
-#         return None
+    s = libConnectPico.initConnectRPI(host, port)
+    return s
 
 
 # ----------------------------------
@@ -168,34 +121,6 @@ def ledChange(**kwargs):
     return False
 
 
-# ----------------------------------
-# Funciones por hilos
-# ----------------------------------
-# def serverWorker():
-#     while True:
-#         initStatusLED(None, 1)
-#         fn = reciveData()
-#         if fn is not None:
-#             print(f"\t▣ Action: {fn['function']} -> {fn['args']}")
-#             actions(fn["function"], fn["args"])
-
-
-def getData_Send():
-    data = []
-    while True:
-        # data.append(sensorUltrasonico())
-        data.append(sensorIR())
-        # Los demas datos de otros sensores aqui
-
-        # Manda los datos
-        for i, d in enumerate(data):
-            print(f"\t ■ {i+1} Sensor: {d["type"]}", end="\n\n")
-            request = create_request(d.sensor, d.data)
-            start_connection(host, port, request)
-            utime.sleep(0.2)
-        data = []
-
-
 def actions(strFunction: str, kwargs: dict):
     actionsToDo = {
         "openDoor": openDoor,
@@ -203,6 +128,25 @@ def actions(strFunction: str, kwargs: dict):
     }
     status = actionsToDo[strFunction](**kwargs)
     print(f"\t\t ✩ Status Action: {status}")
+
+
+# ----------------------------------
+# Funciones para datos
+# ----------------------------------
+def recolectData():
+    data = []
+    while True:
+        # data.append(sensorUltrasonico())
+        data.append(sensorIR())
+        # Los demas datos de otros sensores aqui
+
+        # Manda los datos
+        d: Sensor
+        for i, d in enumerate(data):
+            print(f"\t ■ {i+1} Sensor: {d.sensorName}", end="\n\n")
+            libConnectPico.senderWorker(server, d)
+            utime.sleep(0.2)
+        data = []
 
 
 def initStatusLED(wlan, mode: int = 0):
@@ -232,12 +176,15 @@ def initStatusLED(wlan, mode: int = 0):
             utime.sleep(0.01)
 
 
+# ----------------------------------
+# Main
+# ----------------------------------
 if __name__ == '__main__':
     print("Init program...")
     LED_BICOLOR[1].value(0)
     LED_BICOLOR[0].value(0)
     try:
-        # server = connectServer()
+        server = connectServer(host="192.168.68.104", port=8080)
         utime.sleep(2)
         LED_BICOLOR[1].value(1)
         LED_BICOLOR[0].value(0)
@@ -245,5 +192,6 @@ if __name__ == '__main__':
         print("Error! -> ", e)
         sys.exit()
 
-    # _thread.start_new_thread(serverWorker, ())
-    # getData_Send()
+    initStatusLED(None, 1)
+    # _thread.start_new_thread(libConnectPico.listenerWorker, ())
+    recolectData()
