@@ -34,6 +34,13 @@ class Sensor:
         self.sensorName = sensor
         self.data = dict(data)
 
+    def toDict(self):
+        return {
+            "sensorName": self.sensorName,
+            "data": self.data,
+            "time": utime.localtime()
+        }
+
 
 # ----------------------------------
 # Funciones conectividad
@@ -43,8 +50,8 @@ def connectServer(host, port):
 
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    # wlan.connect('RPI_Home', "Home@IoT")
-    wlan.connect('Macuco', "DOMINGO.2022")
+    wlan.connect('RPI_Home', "Home@IoT")
+    # wlan.connect('Alec Honor', "DarklinkA")
     try:
         initStatusLED(wlan)
     except OSError as err:
@@ -127,7 +134,7 @@ def actions(strFunction: str, kwargs: dict):
         "ledChange": ledChange
     }
     status = actionsToDo[strFunction](**kwargs)
-    print(f"\t\t ✩ Status Action: {status}")
+    print(f"\t\t # Status Action: {status}")
 
 
 # ----------------------------------
@@ -140,13 +147,12 @@ def recolectData():
         data.append(sensorIR())
         # Los demas datos de otros sensores aqui
 
-        # Manda los datos
         d: Sensor
         for i, d in enumerate(data):
-            print(f"\t ■ {i+1} Sensor: {d.sensorName}", end="\n\n")
-            libConnectPico.senderWorker(server, d)
-            utime.sleep(0.2)
+            print(f"■ {i+1} Sensor: {d.sensorName}", end="\n\n")
+            libConnectPico.senderWorker(server, d.toDict())
         data = []
+        utime.sleep(1.5)
 
 
 def initStatusLED(wlan, mode: int = 0):
@@ -165,6 +171,7 @@ def initStatusLED(wlan, mode: int = 0):
                 utime.sleep(0.01)
         pwmLed.deinit()
         LED_BICOLOR[0].init(mode=Pin.OUT)
+        LED_BICOLOR[1].init(mode=Pin.OUT)
         LED_BICOLOR[0].value(1)
         LED_BICOLOR[1].value(1)
     else:
@@ -174,6 +181,13 @@ def initStatusLED(wlan, mode: int = 0):
         for i in range(100):
             pwmLed.duty_u16(100*(100-i))
             utime.sleep(0.01)
+        for i in range(100):
+            pwmLed.duty_u16(100*i)
+            utime.sleep(0.01)
+        LED_BICOLOR[0].init(mode=Pin.OUT)
+        LED_BICOLOR[1].init(mode=Pin.OUT)
+        LED_BICOLOR[0].value(0)
+        LED_BICOLOR[1].value(1)
 
 
 # ----------------------------------
@@ -184,14 +198,12 @@ if __name__ == '__main__':
     LED_BICOLOR[1].value(0)
     LED_BICOLOR[0].value(0)
     try:
-        server = connectServer(host="192.168.68.104", port=8080)
-        utime.sleep(2)
-        LED_BICOLOR[1].value(1)
-        LED_BICOLOR[0].value(0)
+        server = connectServer(host="200.10.0.6", port=8080)
+        # server = connectServer(host="192.168.191.1", port=8080)
+        initStatusLED(None, 1)
     except (OSError) as e:
         print("Error! -> ", e)
         sys.exit()
 
-    initStatusLED(None, 1)
-    # _thread.start_new_thread(libConnectPico.listenerWorker, ())
+    _thread.start_new_thread(libConnectPico.listenerWorker, (server,))
     recolectData()
