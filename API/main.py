@@ -9,7 +9,12 @@ class Request:
         self.crud = dRequest.get("crud")
         self.data = dRequest.get("data")
 
-    def validateRequest(self):
+    def validateRequest(self, method=None):
+        if method == "POST" and self.crud not in ["INSERT", "DELETE", "UPDATE"]:
+            return ["Invalid CRUD"]
+        if method == "GET" and self.crud not in ["SELECT"]:
+            return ["Invalid CRUD"]
+
         miss = []
         var = vars(self)
         for name, value in var.items():
@@ -27,11 +32,10 @@ class Request:
 app = Flask(__name__)
 
 
-# @app.route("/api/v1/sql", methods=["GET"])
-@app.route("/api/v1/sql", methods=["POST"])
+@app.route("/api/v1/sql", methods=["GET", "POST"])
 def mainGETDB():
     req = Request(request.json)
-    if miss := req.validateRequest():
+    if miss := req.validateRequest(request.method):
         return req.respondServer(("error", "Missing " + ", ".join(miss)), 400)
     if req.db == "SQL":
         try:
