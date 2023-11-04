@@ -2,7 +2,7 @@ import sys
 import threading
 import queue
 from datetime import datetime
-import libConnect
+import libConnectRPI
 
 
 # ----------------------------------
@@ -56,10 +56,10 @@ class dataSensor:
 # ----------------------------------
 # Funciones Conectividad
 # ----------------------------------
-def sendData(pico: libConnect.Connection, rpi: libConnect.Connection, dataS: dataSensor):
+def sendData(pico: libConnectRPI.Connection, rpi: libConnectRPI.Connection, dataS: dataSensor):
     if dataS.fn:
-        libConnect.senderWorker(pico, dataS.toFn())
-    # libConnect.senderWorker(rpi, dataS.toServer())
+        libConnectRPI.senderWorker(pico, dataS.toFn())
+    libConnectRPI.senderWorker(rpi, dataS.toServer())
 
 # ----------------------------------
 # Funciones por hilos
@@ -120,10 +120,10 @@ def sTemp(**kwargs):
 # ----------------------------------
 if __name__ == '__main__':
     print("Init program...")
-    connPICO = libConnect.initConnectPico()
-    connRPI = libConnect.initConnectRPI(host="200.10.0.1", port=2050)
+    connPICO = libConnectRPI.initConnectPico()
+    connRPI = libConnectRPI.initConnectRPI(host="200.10.0.1", port=2050)
 
-    gD = threading.Thread(target=libConnect.listenerWorker,
+    gD = threading.Thread(target=libConnectRPI.listenerWorker,
                           args=(connPICO, q), daemon=True)
     sD = threading.Thread(target=functionWorker, args=(
         connPICO, connRPI), daemon=True)
