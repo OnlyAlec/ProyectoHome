@@ -42,9 +42,9 @@ cursor = connection.cursor()
 #         ("Task 4", 0),
 #         ("Task 5", 1)]
 
-# cursor.executemany(
-#     "insert into todoitem (description, done) values(:1, :2)", rows)
-# print(cursor.rowcount, "Rows Inserted")
+cursor.executemany(
+    "insert into todoitem (description, done) values(:1, :2)", rows)
+print(cursor.rowcount, "Rows Inserted")
 
 # connection.commit()
 
