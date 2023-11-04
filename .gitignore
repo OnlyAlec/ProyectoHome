@@ -2,3 +2,5 @@
 .venv
 .micropico
 Auth
+__pycache__
+API/__pycache__

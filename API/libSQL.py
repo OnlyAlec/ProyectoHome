@@ -1,5 +1,5 @@
-import oracledb
 import os
+import oracledb
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,20 +20,20 @@ class DB:
 
         print("Connecting to SQL...", end=" ")
         ip = os.getenv("DB_IP")
-        pwd: str = os.getenv("DB_PASSWORD")
-        userDB: str = os.getenv("DB_USER")
+        pwd = os.getenv("DB_PASSWORD")
+        userDB = os.getenv("DB_USER")
 
         try:
             self.connection: oracledb.Connection = oracledb.connect(
-                user=userDB,
-                password=pwd,
+                user=str(userDB),
+                password=str(pwd),
                 dsn=f"{ip}/xepdb1")
             print("OK!")
             self.cursor = self.connection.cursor()
             return True
         except oracledb.DatabaseError as e:
             print(f"Failed! -> \t {e}")
-            return False
+            raise e
 
     def getAllTables(self):
         self.cursor.execute("SELECT table_name FROM user_tables")
@@ -45,63 +45,63 @@ class DB:
         for table in data.copy():
             data[table.upper()] = data.pop(table)
 
-    def respondError(self, e):
-        return {
-            "status": "error",
-            "message": e
-        }
-
 
 class Operation:
-    def __init__(self, dbDest: DB, crud, data: dict):
+    def __init__(self, dbDest: DB, crud: str, data: dict, condition=None):
         self.db = dbDest
         self.crud = crud
         self.tables = data
         self.order = {}
-        self.execute()
+        self.condition = condition
+        self.error = self.execute()
 
     def execute(self):
         e = self.validation(self.tables)
-        if e is not True:
-            return self.db.respondError(e)
+        if e != "":
+            return e
         getattr(self, self.crud.lower())()
+        self.db.connection.commit()
 
     def validation(self, data: dict):
         self.db.columnsUpper(data)
-        # Valida si existen las tablas y columnas
+        # ^ Para UPDATE y DELETE valida que exista la condicion
+        if self.crud in ["UPDATE", "DELETE"]:
+            if self.condition is None:
+                return "Condition is required for this operation!"
+        #! Valida si existen las tablas y columnas
         for table in data:
             if not table in self.db.allTables:
-                e = f"Table {table} not exist!"
-                return e
+                return f"Table {table} not exist!"
 
             for column in data[table]:
                 if not self.existColumn(table, column):
-                    e = f"Column {column} not exist!"
-                    return e
-        # Ordena las tablas para insertar primero en las tablas hijas
-        self.orderTables(self.tables)
-        # Verifica si los datos recibidos sirven para insertar o existen en la db
-        lastTableInsert = ""
-        for table in self.order.items():
-            if lastTableInsert == table[0]:
-                continue
-            for child in table[1]:
-                if self.tables[table[0]][child] is None:
-                    if child.split("_")[1].upper() not in self.tables:
-                        print(f"Data for table {child} is required!")
-                        return False
-                    childName = child.split("_")[1].upper()
-                    dictData = {childName: self.tables[childName]}
-                    try:
-                        Operation(self.db, self.crud, dictData)
-                        self.tables[table[0]][child] = self.recoverLastID(
-                            childName)
-                        self.tables.pop(childName)
-                        lastTableInsert = childName
-                    except oracledb.DatabaseError as e:
-                        print(e)
-                        return e
-        return True
+                    return f"Column {column} not exist!"
+
+        # ^ Solo INSERT
+        if self.crud == "INSERT":
+            #! Ordena las tablas para insertar primero en las tablas hijas
+            self.orderTables(self.tables)
+
+            #! Verifica si los datos recibidos sirven para insertar o existen en la db
+            lastTableInsert = ""
+            for table in self.order.items():
+                if lastTableInsert == table[0]:
+                    continue
+                for child in table[1]:
+                    if self.tables[table[0]][child] is None:
+                        if child.split("_")[1].upper() not in self.tables:
+                            return "Data for table {child} is required!"
+                        childName = child.split("_")[1].upper()
+                        dictData = {childName: self.tables[childName]}
+                        try:
+                            Operation(self.db, self.crud, dictData)
+                            self.tables[table[0]][child] = self.recoverLastID(
+                                childName)
+                            self.tables.pop(childName)
+                            lastTableInsert = childName
+                        except oracledb.DatabaseError as e:
+                            return str(e.args[0].message.split("\n")[0])
+            return ""
 
     def existColumn(self, table: str, column: str):
         try:
@@ -136,38 +136,50 @@ class Operation:
             try:
                 print("Inserting...", end=" ")
                 self.db.cursor.execute(query)
-                self.db.connection.commit()
                 print("OK!")
             except oracledb.DatabaseError as e:
                 raise e
 
-#   def update(self):
+    def update(self):
+        for table in self.tables:
+            query = f"UPDATE {table} SET "
+            for column, values in self.tables[table]:
+                if column == "condition":
+                    continue
+                if isinstance(values, str):
+                    query += f"{column}='{values}', "
+                elif isinstance(values, int):
+                    query += f"{column}={values}, "
+            query += f"WHERE {self.condition}"
+            try:
+                print("Updating...", end=" ")
+                self.db.cursor.execute(query)
+                print("OK!")
+            except oracledb.DatabaseError as e:
+                raise e
 
-#   def delete(self):
+    def delete(self):
+        for table in self.tables:
+            query = f"DELETE FROM {table} WHERE {self.condition}"
+            try:
+                print("Deleting...", end=" ")
+                self.db.cursor.execute(query)
+                print("OK!")
+            except oracledb.DatabaseError as e:
+                raise e
 
-#   def select(self):
-
-
-# def getData(request: flask.Request):
-#   data = request.get_json()
-#   if
-
-if __name__ == "__main__":
-    dbSQL = DB()
-    entry = {
-        "Persona": {
-            "edad": 20,
-            "correo": "linbeck@outlook.es",
-            "ID_persona": 1,
-            "cve_nombre": None,
-            "cve_rol": 1,
-            "cve_casa": 1,
-        },
-        "Nombre": {
-            "nombre": "Alexis",
-            "apellido_paterno": "Chacon",
-            "apellido_materno": "Trujillo",
-            "ID_Nombre": 1
-        }
-    }
-    statusOperation = Operation(dbSQL, "INSERT", entry)
+    def select(self):
+        for table in self.tables:
+            query = "SELECT "
+            for values in self.tables[table].values():
+                if values is None:
+                    query += "*  "
+                    break
+                query += f"'{values}', "
+            query = query[:-2] + f"FROM {table}"
+            try:
+                print("Selecting...", end=" ")
+                self.db.cursor.execute(query)
+                print("OK!")
+            except oracledb.DatabaseError as e:
+                raise e

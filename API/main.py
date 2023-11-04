@@ -1,16 +1,13 @@
-from flask import Flask, request
-from datetime import datetime
-import json
+from flask import Flask, request, make_response
 from libSQL import DB, Operation
 # import libNOSQL as dbNSQL
 
 
 class Request:
-    def __init__(self, dRequest: dict):
-        self.db = dRequest["db"]
-        self.crud = dRequest["crud"]
-        self.dest = dRequest["dest"]
-        self.data = dRequest["data"]
+    def __init__(self, dRequest):
+        self.db = dRequest.get("db")
+        self.crud = dRequest.get("crud")
+        self.data = dRequest.get("data")
 
     def validateRequest(self):
         miss = []
@@ -20,27 +17,10 @@ class Request:
                 miss.append(name)
         return miss
 
-
-class response:
-    def __init__(self, status: str, message: str, time: str):
-        self.status = status
-        self.message = message
-        self.time = time
-        self.error = None
-
-    def errorFormat(self):
-        return json.dumps({
-            "status": self.status,
-            "error": self.error,
-            "time": self.time
-        })
-
-    def successFormat(self):
-        return json.dumps({
-            "status": self.status,
-            "message": self.message,
-            "time": self.time
-        })
+    def respondServer(self, text: tuple[str, str | Exception], code: int):
+        resp = make_response({text[0]: text[1]}, code)
+        resp.headers["Content-Type"] = "application/json"
+        return resp
 
 
 # Init
@@ -50,13 +30,18 @@ app = Flask(__name__)
 # @app.route("/api/v1/sql", methods=["GET"])
 @app.route("/api/v1/sql", methods=["POST"])
 def mainGETDB():
-    req = Request(request.form.to_dict())
+    req = Request(request.json)
     if miss := req.validateRequest():
-        return response("400", "Missing {miss}" + " " + ", ".join(miss), str(datetime.now())).errorFormat()
+        return req.respondServer(("error", "Missing " + ", ".join(miss)), 400)
     if req.db == "SQL":
-        db = DB()
-        Operation(db, req.crud, req.data)
-        return response("200", "OK", str(datetime.now())).successFormat()
+        try:
+            db = DB()
+            reqOp = Operation(db, req.crud, req.data)
+            if reqOp.error:
+                return req.respondServer(("error", reqOp.error), 400)
+            return req.respondServer(("action", "OK"), 200)
+        except Exception as e:
+            return req.respondServer(("error", e), 500)
     # elif req.db == "NOSQL":
         # db = dbNSQL.DB()
     return {}
