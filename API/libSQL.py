@@ -10,8 +10,12 @@ class DB:
         self.allTables = []
         self.connection: oracledb.Connection = None
         self.cursor: oracledb.Cursor = None
-        self.connect()
-        self.getAllTables()
+
+        try:
+            self.connect()
+            self.getAllTables()
+        except Exception as e:
+            raise e
 
     def connect(self):
         if self.connection is not None:
@@ -31,7 +35,7 @@ class DB:
             print("OK!")
             self.cursor = self.connection.cursor()
             return True
-        except oracledb.DatabaseError as e:
+        except (oracledb.DatabaseError, oracledb.OperationalError) as e:
             print(f"Failed! -> \t {e}")
             raise e
 
@@ -41,9 +45,13 @@ class DB:
             table[0] for table in self.cursor.fetchall()
         ]
 
-    def columnsUpper(self, data: dict):
-        for table in data.copy():
-            data[table.upper()] = data.pop(table)
+    def columnsUpper(self, data: dict | list):
+        if isinstance(data, dict):
+            for table in data.copy():
+                data[table.upper()] = data.pop(table)
+        elif isinstance(data, list):
+            for table in data.copy():
+                data[data.index(table)] = table.upper()
 
 
 class Operation:
@@ -100,7 +108,7 @@ class Operation:
                             self.tables.pop(childName)
                             lastTableInsert = childName
                         except oracledb.DatabaseError as e:
-                            return str(e.args[0].message.split("\n")[0])
+                            raise e
             return ""
 
     def existColumn(self, table: str, column: str):
