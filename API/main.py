@@ -1,6 +1,7 @@
 from flask import Flask, request, make_response
 from libSQL import DB, Operation
 from flask_cors import CORS
+import json
 # import libNOSQL as dbNSQL
 
 
@@ -16,17 +17,9 @@ class Request:
         if method == "GET" and self.crud not in ["SELECT"]:
             return ["Invalid CRUD"]
 
-        miss = []
-        var = vars(self)
-        for name, value in var.items():
-            if value is None or value == "" or value is False:
-                miss.append(name)
-        return miss
-
     def getData(self, data: str | dict):
         if isinstance(data, str):
-            key, value = data.split(":")[0], data.split(":")[1]
-            return [key, value]
+            return json.loads(data)
 
         if isinstance(data, dict):
             return data
@@ -45,18 +38,13 @@ CORS(app)
 
 @app.route("/api/v1/sql", methods=["GET", "POST"])
 def mainGETDB():
-    if request.is_json is False:
-        req = Request(request.args)
-    else:
-        req = Request(request.json)
+    req = Request(request.json if request.is_json else request.args)
     if miss := req.validateRequest(request.method):
         return req.respondServer(("error", "Missing " + ", ".join(miss)), 400)
     if req.db == "SQL":
         try:
             db = DB()
             reqOp = Operation(db, req.crud, req.data)
-            if reqOp.error:
-                return req.respondServer(("error", reqOp.error), 400)
             return req.respondServer(("action", "OK"), 200)
         except Exception as e:
             return req.respondServer(("error", e.args[0].message.split("\n")[0]), 500)

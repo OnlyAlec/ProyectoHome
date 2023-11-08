@@ -1,8 +1,66 @@
 import os
 import oracledb
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class Table:
+    def __init__(self, jsonData: dict):
+        self.table: list = []
+        self.alias: list = []
+        self.columns: list = []
+        self.values: list = []
+        self.where: str = ""
+        self.query: str = ""
+        self.asTable: str = ""
+        self.groupBy: str = ""
+        self.construct(jsonData)
+
+    def construct(self, jsonData: dict):
+        for key, value in jsonData.items():
+            if key == "Tables":
+                for table, alias in value.items():
+                    self.table.append(table)
+                    self.alias.append(alias)
+            elif key == "Columns":
+                if isinstance(value, list):
+                    self.columns = value
+                elif isinstance(value, dict):
+                    for table, columns in value.items():
+                        self.columns.append({table: columns})
+            elif key == "Values":
+                for values in value:
+                    self.values.append(values)
+            elif key == "Where":
+                self.where = value
+            elif key == "query":
+                self.query = value
+            elif key == "As":
+                self.asTable = value
+            elif key == "GroupBy":
+                self.groupBy = value
+            else:
+                raise ValueError("Key not found!")
+
+    def toUpper(self):
+        self.table = [table.upper() for table in self.table]
+        self.columns = [column.upper() for column in self.columns]
+
+    def strTable(self):
+        query = ""
+        if len(self.table) == len(self.alias) == len(self.asTable):
+            for table, alias, asTable in self.table, self.alias, self.asTable:
+                query += f"{table}"
+                if alias != "":
+                    query += f" {alias}"
+                if asTable != "":
+                    query += f" AS {asTable}"
+                query += ", "
+
+    def strValues(self):
+        return ", ".join(self.values)
 
 
 class DB:
@@ -45,92 +103,92 @@ class DB:
             table[0] for table in self.cursor.fetchall()
         ]
 
-    def columnsUpper(self, data: dict | list):
-        if isinstance(data, dict):
-            for table in data.copy():
-                data[table.upper()] = data.pop(table)
-        elif isinstance(data, list):
-            for table in data.copy():
-                data[data.index(table)] = table.upper()
-
-
-class Operation:
-    def __init__(self, dbDest: DB, crud: str, data: dict, condition=None):
-        self.db = dbDest
-        self.crud = crud
-        self.tables = data
-        self.order = {}
-        self.condition = condition
-        self.error = self.execute()
-
-    def execute(self):
-        e = self.validation(self.tables)
-        if e != "":
-            return e
-        getattr(self, self.crud.lower())()
-        self.db.connection.commit()
-
-    def validation(self, data: dict):
-        self.db.columnsUpper(data)
-        # ^ Para UPDATE y DELETE valida que exista la condicion
-        if self.crud in ["UPDATE", "DELETE"]:
-            if self.condition is None:
-                return "Condition is required for this operation!"
-        #! Valida si existen las tablas y columnas
-        for table in data:
-            if not table in self.db.allTables:
-                return f"Table {table} not exist!"
-
-            for column in data[table]:
-                if not self.existColumn(table, column):
-                    return f"Column {column} not exist!"
-
-        # ^ Solo INSERT
-        if self.crud == "INSERT":
-            #! Ordena las tablas para insertar primero en las tablas hijas
-            self.orderTables(self.tables)
-
-            #! Verifica si los datos recibidos sirven para insertar o existen en la db
-            lastTableInsert = ""
-            for table in self.order.items():
-                if lastTableInsert == table[0]:
-                    continue
-                for child in table[1]:
-                    if self.tables[table[0]][child] is None:
-                        if child.split("_")[1].upper() not in self.tables:
-                            return "Data for table {child} is required!"
-                        childName = child.split("_")[1].upper()
-                        dictData = {childName: self.tables[childName]}
-                        try:
-                            Operation(self.db, self.crud, dictData)
-                            self.tables[table[0]][child] = self.recoverLastID(
-                                childName)
-                            self.tables.pop(childName)
-                            lastTableInsert = childName
-                        except oracledb.DatabaseError as e:
-                            raise e
-            return ""
-
     def existColumn(self, table: str, column: str):
         try:
-            self.db.cursor.execute(
+            self.cursor.execute(
                 f"SELECT {column} FROM {table} WHERE 1=2")
             return True
         except oracledb.DatabaseError:
             return False
 
-    def orderTables(self, data: dict):
-        for table in data.keys():
-            tablesChild = []
-            for column in data[table]:
-                if column.find("cve_") != -1 and column.find("tipo") == -1:
-                    tablesChild.append(column)
-            self.order[table] = tablesChild
 
-    def recoverLastID(self, table: str):
-        self.db.cursor.execute(
-            f"SELECT MAX(ID_{table}) FROM {table}")
-        return self.db.cursor.fetchone()[0]
+class Operation:
+    def __init__(self, dbDest: DB, crud: str, data: dict):
+        self.db = dbDest
+        self.crud = crud
+        self.data = self.parseJSON(data)
+        self.tablesWaiting: list = []
+        self.tablesObj: list = []
+        self.response: dict = {}
+
+        try:
+            self.getTables()
+            self.checkObligatory()
+            self.execute()
+        except Exception as e:
+            raise e
+
+    def checkObligatory(self):
+        miss = {}
+        if self.crud == "INSERT":
+            need = ["table", "values"]
+        elif self.crud == "UPDATE":
+            need = ["table", "columns", "values", "where"]
+        elif self.crud == "DELETE":
+            need = ["table", "where"]
+        elif self.crud == "SELECT":
+            need = ["query"]
+        else:
+            raise ValueError("CRUD not found!")
+
+        for table in self.tablesWaiting:
+            miss.update({table: []})
+            var = dict((k, vars(self)[k]) for k in need if k in vars(self))
+            for name, value in var.items():
+                if value is None or value == "":
+                    miss[table].append(name)
+
+    def parseJSON(self, data):
+        if isinstance(data, str) and self.crud != "SELECT":
+            return json.loads(data)
+        if isinstance(data, dict):
+            return data
+        raise ValueError("Data is not valid!")
+
+    def getTables(self):
+        if self.crud != "SELECT":
+            for data in self.data:
+                self.tablesWaiting.append(data)
+                self.tablesObj.append(Table(data))
+        else:
+            self.tablesWaiting = []
+            self.tablesObj = []
+
+    def execute(self):
+        try:
+            if self.crud == "SELECT":
+                resp = self.db.cursor.execute(self.data["query"])
+                self.response.update({"data": resp.fetchall()})
+                return True
+
+            for table in self.tablesWaiting:
+                self.checkValidation(
+                    self.tablesObj[self.tablesWaiting.index(table)])
+
+        except (oracledb.DatabaseError, ValueError) as e:
+            raise e
+
+    def checkValidation(self, tableClass: Table):
+        tableClass.toUpper()
+        for tableName in tableClass.table:
+            if not tableName in self.db.allTables:
+                raise ValueError(f"Table {tableName} not exist!")
+
+        for tableName in tableClass.table:
+            for columnName in tableClass.columns:
+                if not self.db.existColumn(tableName, columnName):
+                    raise ValueError(
+                        f"Column {columnName} not exist in table {tableName}!")
 
     def insert(self):
         for table in self.tables:
@@ -171,22 +229,6 @@ class Operation:
             query = f"DELETE FROM {table} WHERE {self.condition}"
             try:
                 print("Deleting...", end=" ")
-                self.db.cursor.execute(query)
-                print("OK!")
-            except oracledb.DatabaseError as e:
-                raise e
-
-    def select(self):
-        for table in self.tables:
-            query = "SELECT "
-            for values in self.tables[table].values():
-                if values is None:
-                    query += "*  "
-                    break
-                query += f"'{values}', "
-            query = query[:-2] + f"FROM {table}"
-            try:
-                print("Selecting...", end=" ")
                 self.db.cursor.execute(query)
                 print("OK!")
             except oracledb.DatabaseError as e:
