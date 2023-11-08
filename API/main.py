@@ -43,7 +43,7 @@ app = Flask(__name__)
 CORS(app)
 
 
-@app.route("/api/v1/sql", methods=["GET", "POST"])
+@app.route("/v1.0/db", methods=["GET", "POST"])
 def mainGETDB():
     if request.is_json is False:
         req = Request(request.args)
