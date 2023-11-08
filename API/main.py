@@ -47,7 +47,8 @@ def mainGETDB():
             reqOp = Operation(db, req.crud, req.data)
             return req.respondServer(("action", "OK"), 200)
         except Exception as e:
-            return req.respondServer(("error", e.args[0].message.split("\n")[0]), 500)
+            # return req.respondServer(("error", e.args[0]), 500)
+            raise e
     # elif req.db == "NOSQL":
     # db = dbNSQL.DB()
     return {}

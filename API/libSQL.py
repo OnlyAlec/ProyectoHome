@@ -7,7 +7,7 @@ load_dotenv()
 
 
 class Table:
-    def __init__(self, jsonData: dict):
+    def __init__(self, jsonData: dict | str):
         self.table: list = []
         self.alias: list = []
         self.columns: list = []
@@ -16,7 +16,10 @@ class Table:
         self.query: str = ""
         self.asTable: str = ""
         self.groupBy: str = ""
-        self.construct(jsonData)
+        if isinstance(jsonData, str):
+            self.query = jsonData
+        else:
+            self.construct(jsonData)
 
     def construct(self, jsonData: dict):
         for key, value in jsonData.items():
@@ -123,7 +126,9 @@ class Operation:
 
         try:
             self.getTables()
-            self.checkObligatory()
+            if miss := self.checkObligatory():
+                raise ValueError(
+                    f"Missing {', '.join(miss)} in {', '.join(miss.keys())}!")
             self.execute()
         except Exception as e:
             raise e
@@ -141,35 +146,35 @@ class Operation:
         else:
             raise ValueError("CRUD not found!")
 
-        for table in self.tablesWaiting:
+        for table in self.tablesObj:
             miss.update({table: []})
-            var = dict((k, vars(self)[k]) for k in need if k in vars(self))
-            for name, value in var.items():
-                if value is None or value == "":
-                    miss[table].append(name)
+            for field in need:
+                if not field in vars(table) and (field is None or field == ""):
+                    miss[table].append(field)
+        return False if len(miss) > 0 else miss
 
     def parseJSON(self, data):
-        if isinstance(data, str) and self.crud != "SELECT":
+        if isinstance(data, str) and self.crud == "SELECT":
             return json.loads(data)
         if isinstance(data, dict):
             return data
         raise ValueError("Data is not valid!")
 
     def getTables(self):
-        if self.crud != "SELECT":
-            for data in self.data:
+        for data in self.data["Tables"]:
+            if self.crud == "SELECT":
                 self.tablesWaiting.append(data)
-                self.tablesObj.append(Table(data))
-        else:
-            self.tablesWaiting = []
-            self.tablesObj = []
+                d = json.dumps(self.data)
+                self.tablesObj.append(Table(d))
+                break
+            self.tablesWaiting.append(data)
+            self.tablesObj.append(Table(data))
 
     def execute(self):
         try:
             if self.crud == "SELECT":
-                resp = self.db.cursor.execute(self.data["query"])
-                self.response.update({"data": resp.fetchall()})
-                return True
+                resp = self.db.cursor.execute(self.tablesObj[0].query)
+                return resp
 
             for table in self.tablesWaiting:
                 self.checkValidation(
