@@ -2,6 +2,7 @@ import os
 import oracledb
 import json
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 
@@ -119,10 +120,10 @@ class Operation:
     def __init__(self, dbDest: DB, crud: str, data: dict):
         self.db = dbDest
         self.crud = crud
-        self.data = self.parseJSON(data)
+        self.data = data
         self.tablesWaiting: list = []
         self.tablesObj: list = []
-        self.response: dict = {}
+        self.response: list = []
 
         try:
             self.getTables()
@@ -142,7 +143,7 @@ class Operation:
         elif self.crud == "DELETE":
             need = ["table", "where"]
         elif self.crud == "SELECT":
-            need = ["query"]
+            return False
         else:
             raise ValueError("CRUD not found!")
 
@@ -161,20 +162,19 @@ class Operation:
         raise ValueError("Data is not valid!")
 
     def getTables(self):
+        if isinstance(self.data, str):
+            return
+
         for data in self.data["Tables"]:
-            if self.crud == "SELECT":
-                self.tablesWaiting.append(data)
-                d = json.dumps(self.data)
-                self.tablesObj.append(Table(d))
-                break
             self.tablesWaiting.append(data)
             self.tablesObj.append(Table(data))
 
     def execute(self):
         try:
-            if self.crud == "SELECT":
-                resp = self.db.cursor.execute(self.tablesObj[0].query)
-                return resp
+            if self.crud == "SELECT" and isinstance(self.data, str):
+                self.db.cursor.execute(self.data)
+                self.response = self.db.cursor.fetchall()
+                return
 
             for table in self.tablesWaiting:
                 self.checkValidation(
