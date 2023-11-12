@@ -158,7 +158,7 @@ def initConnectRPI():
     return m
 
 
-def listenerWorker(conn: Connection, qRecv):
+def listenRPIWorker(conn: Connection, qRecv):
     global q
     q = qRecv
 
