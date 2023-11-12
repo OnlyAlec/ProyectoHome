@@ -1,0 +1,1489 @@
+-------------------------------------------------------------TABLAS PRINCIPALES------------------------------------------------------------------------
+--CASA--
+CREATE TABLE casa (
+  tamanio NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  num_espacios NUMBER,
+  contrasenia RAW(256),
+  id_casa NUMBER NOT NULL,
+  cve_direccion NUMBER NOT NULL,
+  cve_tipopropiedad NUMBER NOT NULL,
+  cve_red NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_casa ON casa (id_casa ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT cve_direccion_ck CHECK (cve_direccion > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT cve_red_ck CHECK (cve_red > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT cve_tipopropiedad_ck CHECK (cve_tipopropiedad > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT id_casa_ck CHECK (id_casa > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT num_espacios_ck CHECK (num_espacios > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT tamanio_ck CHECK (tamanio > 0);
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT pk_casa PRIMARY KEY (id_casa);
+
+CREATE SEQUENCE CASA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_CASA BEFORE
+INSERT
+  ON CASA FOR EACH ROW DECLARE BEGIN
+SELECT
+  CASA_SEQ.NEXTVAL INTO :NEW.ID_CASA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+create
+or replace TRIGGER TIB_CASA_CONTRASENIA BEFORE
+INSERT
+  ON CASA FOR EACH ROW DECLARE BEGIN :NEW.CONTRASENIA := STANDARD_HASH(:NEW.CONTRASENIA, 'SHA256');
+
+END;
+
+/;
+
+CREATE TABLE colonia (
+  descripcion VARCHAR2(100 CHAR),
+  id_colonia NUMBER NOT NULL,
+  cve_municipio NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_colonia ON colonia (id_colonia ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  colonia
+ADD
+  CONSTRAINT cve_municipio_ck CHECK (cve_municipio > 0);
+
+ALTER TABLE
+  colonia
+ADD
+  CONSTRAINT id_colonia_ck CHECK (id_colonia > 0);
+
+ALTER TABLE
+  colonia
+ADD
+  CONSTRAINT pk_colonia PRIMARY KEY (id_colonia);
+
+CREATE SEQUENCE COLONIA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_COLONIA BEFORE
+INSERT
+  ON COLONIA FOR EACH ROW DECLARE BEGIN
+SELECT
+  COLONIA_SEQ.NEXTVAL INTO :NEW.ID_COLONIA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--CONTROL PARENTAL--
+CREATE TABLE controlparental (
+  restriccion VARCHAR2(100 CHAR),
+  id_controlparental NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_controlparental ON controlparental (id_controlparental ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  controlparental
+ADD
+  CONSTRAINT id_controlparental_ck CHECK (id_controlparental > 0);
+
+ALTER TABLE
+  controlparental
+ADD
+  CONSTRAINT pk_controlparental PRIMARY KEY (id_controlparental);
+
+CREATE SEQUENCE CONTROLPARENTAL_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_CONTROLPARENTAL BEFORE
+INSERT
+  ON CONTROLPARENTAL FOR EACH ROW DECLARE BEGIN
+SELECT
+  CONTROLPARENTAL_SEQ.NEXTVAL INTO :NEW.ID_CONTROLPARENTAL
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--CONTROLTIPOROL--
+CREATE TABLE controltiporol (
+  id_controltiporol NUMBER NOT NULL,
+  cve_controlparental NUMBER,
+  cve_tiporol NUMBER
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_controltiporol ON controltiporol (id_controltiporol ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT cve_controlparental_ck CHECK (cve_controlparental > 0);
+
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT cve_tiporol_ck2 CHECK (cve_tiporol > 0);
+
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT id_controltiporol_ck CHECK (id_controltiporol > 0);
+
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT pk_controltiporol PRIMARY KEY (id_controltiporol);
+
+CREATE SEQUENCE CONTROLTIPOROL_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_CONTROLTIPOROL BEFORE
+INSERT
+  ON CONTROLTIPOROL FOR EACH ROW DECLARE BEGIN
+SELECT
+  CONTROLTIPOROL_SEQ.NEXTVAL INTO :NEW.ID_CONTROLTIPOROL
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--CP--
+CREATE TABLE cp (
+  descripcion VARCHAR2(100 CHAR),
+  id_cp NUMBER NOT NULL,
+  cve_colonia NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_cp ON cp (id_cp ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  cp
+ADD
+  CONSTRAINT cve_colonia_ck CHECK (cve_colonia > 0);
+
+ALTER TABLE
+  cp
+ADD
+  CONSTRAINT id_cp_ck CHECK (id_cp > 0);
+
+ALTER TABLE
+  cp
+ADD
+  CONSTRAINT pk_cp PRIMARY KEY (id_cp);
+
+CREATE SEQUENCE CP_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_CP BEFORE
+INSERT
+  ON CP FOR EACH ROW DECLARE BEGIN
+SELECT
+  CP_SEQ.NEXTVAL INTO :NEW.ID_CP
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--DIRECCION--
+CREATE TABLE direccion (
+  calle VARCHAR2(100 CHAR),
+  num_exterior NUMBER,
+  num_interior NUMBER,
+  id_direccion NUMBER NOT NULL,
+  cve_cp NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_direccion ON direccion (id_direccion ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT cve_cp_ck CHECK (cve_cp > 0);
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT id_direccion_ck CHECK (id_direccion > 0);
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT num_exterior_ck CHECK (num_exterior > 0);
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT num_interior_ck CHECK (num_interior > 0);
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT pk_direccion PRIMARY KEY (id_direccion);
+
+CREATE SEQUENCE DIRECCION_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_DIRECCION BEFORE
+INSERT
+  ON DIRECCION FOR EACH ROW DECLARE BEGIN
+SELECT
+  DIRECCION_SEQ.NEXTVAL INTO :NEW.ID_DIRECCION
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--DISPOSITIVO--
+CREATE TABLE dispositivo (
+  id_dispositivo NUMBER NOT NULL,
+  cve_espacio NUMBER NOT NULL,
+  cve_tipofoco NUMBER,
+  cve_tiposervomotor NUMBER,
+  cve_tipoalarma NUMBER,
+  cve_tipodispositivo NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_dispositivo ON dispositivo (id_dispositivo ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT cve_espacio_ck2 CHECK (cve_espacio > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT cve_tipoalarma_ck CHECK (cve_tipoalarma > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT cve_tipodispositivo_ck CHECK (cve_tipodispositivo > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT cve_tipofoco_ck CHECK (cve_tipofoco > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT cve_tiposervomotor_ck CHECK (cve_tiposervomotor > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT id_dispositivo_ck CHECK (id_dispositivo > 0);
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT pk_dispositivo PRIMARY KEY (id_dispositivo);
+
+CREATE SEQUENCE DISPOSITIVO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_DISPOSITIVO BEFORE
+INSERT
+  ON DISPOSITIVO FOR EACH ROW DECLARE BEGIN
+SELECT
+  DISPOSITIVO_SEQ.NEXTVAL INTO :NEW.ID_DISPOSITIVO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--ESPACIO--
+CREATE TABLE espacio (
+  num_dispositivos NUMBER,
+  cve_tipoespacio NUMBER NOT NULL,
+  id_espacio NUMBER NOT NULL,
+  cve_casa NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_espacio ON espacio (id_espacio ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT cve_casa_ck1 CHECK (cve_casa > 0);
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT cve_tipoespacio_ck CHECK (cve_tipoespacio > 0);
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT id_espacio_ck CHECK (id_espacio > 0);
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT num_dispositivos_ck CHECK (num_dispositivos > 0);
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT pk_espacio PRIMARY KEY (id_espacio);
+
+CREATE SEQUENCE ESPACIO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_ESPACIO BEFORE
+INSERT
+  ON ESPACIO FOR EACH ROW DECLARE BEGIN
+SELECT
+  ESPACIO_SEQ.NEXTVAL INTO :NEW.ID_ESPACIO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--LADA--
+CREATE TABLE lada (
+  codigo NUMBER,
+  id_lada NUMBER NOT NULL,
+  cve_tipoestado NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_lada ON lada (id_lada ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  lada
+ADD
+  CONSTRAINT codigo_ck CHECK (codigo > 0);
+
+ALTER TABLE
+  lada
+ADD
+  CONSTRAINT id_lada_ck CHECK (id_lada > 0);
+
+ALTER TABLE
+  lada
+ADD
+  CONSTRAINT cve_tipoestado_ck CHECK (cve_tipoestado > 0);
+
+ALTER TABLE
+  lada
+ADD
+  CONSTRAINT pk_lada PRIMARY KEY (id_lada);
+
+CREATE SEQUENCE LADA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_LADA BEFORE
+INSERT
+  ON LADA FOR EACH ROW DECLARE BEGIN
+SELECT
+  LADA_SEQ.NEXTVAL INTO :NEW.ID_LADA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--MUNICIPIO--
+CREATE TABLE municipio (
+  descripcion VARCHAR2(100 CHAR),
+  id_municipio NUMBER NOT NULL,
+  cve_tipoestado NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_municipio ON municipio (id_municipio ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  municipio
+ADD
+  CONSTRAINT cve_tipoestado_ckk CHECK (cve_tipoestado > 0);
+
+ALTER TABLE
+  municipio
+ADD
+  CONSTRAINT id_municipio_ck CHECK (id_municipio > 0);
+
+ALTER TABLE
+  municipio
+ADD
+  CONSTRAINT pk_municipio PRIMARY KEY (id_municipio);
+
+CREATE SEQUENCE MUNICIPIO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_MUNICIPIO BEFORE
+INSERT
+  ON MUNICIPIO FOR EACH ROW DECLARE BEGIN
+SELECT
+  MUNICIPIO_SEQ.NEXTVAL INTO :NEW.ID_MUNICIPIO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--NOMBRE--
+CREATE TABLE nombre (
+  nombre VARCHAR2(100 CHAR),
+  apellido_paterno VARCHAR2(100 CHAR),
+  apellido_materno VARCHAR2(100 CHAR),
+  id_nombre NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_nombre ON nombre (id_nombre ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  nombre
+ADD
+  CONSTRAINT id_nombre_ck CHECK (id_nombre > 0);
+
+ALTER TABLE
+  nombre
+ADD
+  CONSTRAINT pk_nombre PRIMARY KEY (id_nombre);
+
+CREATE SEQUENCE NOMBRE_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_NOMBRE BEFORE
+INSERT
+  ON NOMBRE FOR EACH ROW DECLARE BEGIN
+SELECT
+  NOMBRE_SEQ.NEXTVAL INTO :NEW.ID_NOMBRE
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--PERSONA--
+CREATE TABLE persona (
+  edad NUMBER,
+  correo VARCHAR2(100 CHAR),
+  id_persona NUMBER NOT NULL,
+  cve_nombre NUMBER NOT NULL,
+  cve_tiporol NUMBER NOT NULL,
+  cve_casa NUMBER NOT NULL,
+  uid_db VARCHAR2(100 CHAR)
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_persona ON persona (id_persona ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT cve_casa_ck3 CHECK (cve_casa > 0);
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT cve_nombre_ck CHECK (cve_nombre > 0);
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT cve_tiporol_ck1 CHECK (cve_tiporol > 0);
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT edad_ck CHECK (edad > 0);
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT id_persona_ckk CHECK (id_persona > 0);
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT pk_persona PRIMARY KEY (id_persona);
+
+CREATE SEQUENCE PERSONA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_PERSONA BEFORE
+INSERT
+  ON PERSONA FOR EACH ROW DECLARE BEGIN
+SELECT
+  PERSONA_SEQ.NEXTVAL INTO :NEW.ID_PERSONA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--RED--
+CREATE TABLE red (
+  ip VARCHAR2(100),
+  mascara VARCHAR2(100 CHAR),
+  nombre_red VARCHAR2(100 CHAR),
+  contrasenia_red VARCHAR2(100 CHAR),
+  id_red NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_red ON red (id_red ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  red
+ADD
+  CONSTRAINT id_red_ck CHECK (id_red > 0);
+
+ALTER TABLE
+  red
+ADD
+  CONSTRAINT pk_red PRIMARY KEY (id_red);
+
+CREATE SEQUENCE RED_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_RED BEFORE
+INSERT
+  ON RED FOR EACH ROW DECLARE BEGIN
+SELECT
+  RED_SEQ.NEXTVAL INTO :NEW.ID_RED
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--REGISTROACCESO--
+CREATE TABLE registroacceso (
+  fecha_acceso DATE,
+  id_registroacceso NUMBER NOT NULL,
+  cve_persona NUMBER NOT NULL,
+  cve_casa NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_registroacceso ON registroacceso (id_registroacceso ASC) TABLESPACE INDX;
+
+CREATE INDEX xie1fecha_acceso_n ON registroacceso (fecha_acceso ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT cve_casa_ck2 CHECK (cve_casa > 0);
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT id_registroacceso_ck CHECK (id_registroacceso > 0);
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT cve_persona_ck2 CHECK (cve_persona > 0);
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT pk_registroacceso PRIMARY KEY (id_registroacceso);
+
+CREATE SEQUENCE REGISTROACCESO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_REGISTROACCESO BEFORE
+INSERT
+  ON REGISTROACCESO FOR EACH ROW DECLARE BEGIN
+SELECT
+  REGISTROACCESO_SEQ.NEXTVAL INTO :NEW.ID_REGISTROACCESO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--SENSOR--
+CREATE TABLE sensor (
+  id_sensor NUMBER NOT NULL,
+  cve_espacio NUMBER NOT NULL,
+  cve_tipoluz NUMBER,
+  cve_tipotemperatura NUMBER,
+  cve_tipohumedad NUMBER,
+  cve_tipogas NUMBER,
+  cve_tiposensor NUMBER NOT NULL,
+  fecha_instalacion DATE
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_sensor ON sensor (id_sensor ASC) TABLESPACE INDX;
+
+CREATE INDEX xie1fecha_instalacion_n ON sensor (fecha_instalacion ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_espacio_ck1 CHECK (cve_espacio > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_tipogas_ck CHECK (cve_tipogas > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_tipohumedad_ck CHECK (cve_tipohumedad > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_tipoluz_ck CHECK (cve_tipoluz > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_tiposensor_ck CHECK (cve_tiposensor > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT cve_tipotemperatura_ck CHECK (cve_tipotemperatura > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT id_sensor_ck CHECK (id_sensor > 0);
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT pk_sensor PRIMARY KEY (id_sensor);
+
+CREATE SEQUENCE SENSOR_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_SENSOR BEFORE
+INSERT
+  ON SENSOR FOR EACH ROW DECLARE BEGIN
+SELECT
+  SENSOR_SEQ.NEXTVAL INTO :NEW.ID_SENSOR
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TELEFONO--
+CREATE TABLE telefono (
+  num_telefonico NUMBER,
+  id_telefono NUMBER NOT NULL,
+  cve_persona NUMBER NOT NULL,
+  cve_lada NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_telefono ON telefono (id_telefono ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT cve_lada_ck2 CHECK (cve_lada > 0);
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT id_telefono_ck CHECK (id_telefono > 0);
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT num_telefonico_ck CHECK (num_telefonico > 0);
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT cve_persona_ck1 CHECK (cve_persona > 0);
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT pk_telefono PRIMARY KEY (id_telefono);
+
+CREATE SEQUENCE TELEFONO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TELEFONO BEFORE
+INSERT
+  ON TELEFONO FOR EACH ROW DECLARE BEGIN
+SELECT
+  TELEFONO_SEQ.NEXTVAL INTO :NEW.ID_TELEFONO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOALARMA--
+CREATE TABLE tipoalarma (
+  marca VARCHAR2(100 CHAR),
+  modelo VARCHAR2(100 CHAR),
+  descripcion VARCHAR2(100 CHAR),
+  frecuencia NUMBER,
+  intensidad_sonido NUMBER,
+  id_tipoalarma NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipoalarma ON tipoalarma (id_tipoalarma ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipoalarma
+ADD
+  CONSTRAINT frecuencia_ck CHECK (frecuencia > 0);
+
+ALTER TABLE
+  tipoalarma
+ADD
+  CONSTRAINT id_tipoalarma_ck CHECK (id_tipoalarma > 0);
+
+ALTER TABLE
+  tipoalarma
+ADD
+  CONSTRAINT intensidad_sonido_ck CHECK (intensidad_sonido > 0);
+
+ALTER TABLE
+  tipoalarma
+ADD
+  CONSTRAINT pk_tipoalarma PRIMARY KEY (id_tipoalarma);
+
+CREATE SEQUENCE TIPOALARMA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOALARMA BEFORE
+INSERT
+  ON TIPOALARMA FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOALARMA_SEQ.NEXTVAL INTO :NEW.ID_TIPOALARMA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPODISPOSITIVO--
+CREATE TABLE tipodispositivo (
+  descripcion VARCHAR2(100 CHAR),
+  id_tipodispositivo NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipodispositivo ON tipodispositivo (id_tipodispositivo ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipodispositivo
+ADD
+  CONSTRAINT id_tipodispositivo_ck CHECK (id_tipodispositivo > 0);
+
+ALTER TABLE
+  tipodispositivo
+ADD
+  CONSTRAINT pk_tipodispositivo PRIMARY KEY (id_tipodispositivo);
+
+CREATE SEQUENCE TIPODISPOSITIVO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPODISPOSITIVO BEFORE
+INSERT
+  ON TIPODISPOSITIVO FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPODISPOSITIVO_SEQ.NEXTVAL INTO :NEW.ID_TIPODISPOSITIVO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOESPACIO--
+CREATE TABLE tipoespacio (
+  desccripcion VARCHAR2(100 CHAR),
+  id_tipoespacio NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipoespacio ON tipoespacio (id_tipoespacio ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipoespacio
+ADD
+  CONSTRAINT id_tipoespacio_ck CHECK (id_tipoespacio > 0);
+
+ALTER TABLE
+  tipoespacio
+ADD
+  CONSTRAINT pk_tipoespacio PRIMARY KEY (id_tipoespacio);
+
+CREATE SEQUENCE TIPOESPACIO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOESPACIO BEFORE
+INSERT
+  ON TIPOESPACIO FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOESPACIO_SEQ.NEXTVAL INTO :NEW.ID_TIPOESPACIO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOESTADO--
+CREATE TABLE tipoestado (
+  descripcion VARCHAR2(100 CHAR),
+  id_tipoestado NUMBER NOT NULL,
+  cve_tipopais NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipoestado ON tipoestado (id_tipoestado ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipoestado
+ADD
+  CONSTRAINT cve_tipopais_ck CHECK (cve_tipopais > 0);
+
+ALTER TABLE
+  tipoestado
+ADD
+  CONSTRAINT id_tipoestado_ck CHECK (id_tipoestado > 0);
+
+ALTER TABLE
+  tipoestado
+ADD
+  CONSTRAINT pk_tipoestado PRIMARY KEY (id_tipoestado);
+
+CREATE SEQUENCE TIPOESTADO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOESTADO BEFORE
+INSERT
+  ON TIPOESTADO FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOESTADO_SEQ.NEXTVAL INTO :NEW.ID_TIPOESTADO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOFOCO--
+CREATE TABLE tipofoco (
+  marca VARCHAR2(100 CHAR),
+  modelo VARCHAR2(100 CHAR),
+  potencia NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  intensidad_luminosa NUMBER,
+  id_tipofoco NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipofoco ON tipofoco (id_tipofoco ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipofoco
+ADD
+  CONSTRAINT id_tipofoco_ck CHECK (id_tipofoco > 0);
+
+ALTER TABLE
+  tipofoco
+ADD
+  CONSTRAINT intensidad_luminosa_ck CHECK (intensidad_luminosa > 0);
+
+ALTER TABLE
+  tipofoco
+ADD
+  CONSTRAINT potencia_ck CHECK (potencia > 0);
+
+ALTER TABLE
+  tipofoco
+ADD
+  CONSTRAINT pk_tipofoco PRIMARY KEY (id_tipofoco);
+
+CREATE SEQUENCE TIPOFOCO_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOFOCO BEFORE
+INSERT
+  ON TIPOFOCO FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOFOCO_SEQ.NEXTVAL INTO :NEW.ID_TIPOFOCO
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOGAS--
+CREATE TABLE tipogas (
+  fabricante VARCHAR2(100 CHAR),
+  num_serie NUMBER,
+  rango_medicion NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  id_tipogas NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipogas ON tipogas (id_tipogas ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipogas
+ADD
+  CONSTRAINT id_tipogas_ck CHECK (id_tipogas > 0);
+
+ALTER TABLE
+  tipogas
+ADD
+  CONSTRAINT num_serie_ck4 CHECK (num_serie > 0);
+
+ALTER TABLE
+  tipogas
+ADD
+  CONSTRAINT rango_medicion_ck4 CHECK (rango_medicion > 0);
+
+ALTER TABLE
+  tipogas
+ADD
+  CONSTRAINT pk_tipogas PRIMARY KEY (id_tipogas);
+
+CREATE SEQUENCE TIPOGAS_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOGAS BEFORE
+INSERT
+  ON TIPOGAS FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOGAS_SEQ.NEXTVAL INTO :NEW.ID_TIPOGAS
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOHUMEDAD--
+CREATE TABLE tipohumedad (
+  fabricante VARCHAR2(100 CHAR),
+  num_serie NUMBER,
+  rango_medicion NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  id_tipohumedad NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipohumedad ON tipohumedad (id_tipohumedad ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipohumedad
+ADD
+  CONSTRAINT id_tipohumedad_ck CHECK (id_tipohumedad > 0);
+
+ALTER TABLE
+  tipohumedad
+ADD
+  CONSTRAINT num_serie_ck2 CHECK (num_serie > 0);
+
+ALTER TABLE
+  tipohumedad
+ADD
+  CONSTRAINT rango_medicion_ck2 CHECK (rango_medicion > 0);
+
+ALTER TABLE
+  tipohumedad
+ADD
+  CONSTRAINT pk_tipohumedad PRIMARY KEY (id_tipohumedad);
+
+CREATE SEQUENCE TIPOHUMEDAD_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOHUMEDAD BEFORE
+INSERT
+  ON TIPOHUMEDAD FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOHUMEDAD_SEQ.NEXTVAL INTO :NEW.ID_TIPOHUMEDAD
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOLUZ--
+CREATE TABLE tipoluz (
+  fabricante VARCHAR2(100 CHAR),
+  num_serie NUMBER,
+  rango_medicion NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  id_tipoluz NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipoluz ON tipoluz (id_tipoluz ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipoluz
+ADD
+  CONSTRAINT id_tipoluz_ck CHECK (id_tipoluz > 0);
+
+ALTER TABLE
+  tipoluz
+ADD
+  CONSTRAINT num_serie_ck3 CHECK (num_serie > 0);
+
+ALTER TABLE
+  tipoluz
+ADD
+  CONSTRAINT rango_medicion_ck3 CHECK (rango_medicion > 0);
+
+ALTER TABLE
+  tipoluz
+ADD
+  CONSTRAINT pk_tipoluz PRIMARY KEY (id_tipoluz);
+
+CREATE SEQUENCE TIPOLUZ_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOLUZ BEFORE
+INSERT
+  ON TIPOLUZ FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOLUZ_SEQ.NEXTVAL INTO :NEW.ID_TIPOLUZ
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOPAIS--
+CREATE TABLE tipopais (
+  descripcion VARCHAR2(100 CHAR),
+  id_tipopais NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipopais ON tipopais (id_tipopais ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipopais
+ADD
+  CONSTRAINT id_tipopais_ck CHECK (id_tipopais > 0);
+
+ALTER TABLE
+  tipopais
+ADD
+  CONSTRAINT pk_tipopais PRIMARY KEY (id_tipopais);
+
+CREATE SEQUENCE TIPOPAIS_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOPAIS BEFORE
+INSERT
+  ON TIPOPAIS FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOPAIS_SEQ.NEXTVAL INTO :NEW.ID_TIPOPAIS
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOPROPIEDAD--
+CREATE TABLE tipopropiedad (
+  descripcion VARCHAR2(100 CHAR),
+  id_tipopropiedad NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipopropiedad ON tipopropiedad (id_tipopropiedad ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipopropiedad
+ADD
+  CONSTRAINT id_tipopropiedad_ck CHECK (id_tipopropiedad > 0);
+
+ALTER TABLE
+  tipopropiedad
+ADD
+  CONSTRAINT pk_tipopropiedad PRIMARY KEY (id_tipopropiedad);
+
+CREATE SEQUENCE TIPOPROPIEDAD_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOPROPIEDAD BEFORE
+INSERT
+  ON TIPOPROPIEDAD FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOPROPIEDAD_SEQ.NEXTVAL INTO :NEW.ID_TIPOPROPIEDAD
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOROL--
+CREATE TABLE tiporol (
+  descripcion VARCHAR2(100 CHAR),
+  id_tiporol NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tiporol ON tiporol (id_tiporol ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tiporol
+ADD
+  CONSTRAINT id_tiporol_ck CHECK (id_tiporol > 0);
+
+ALTER TABLE
+  tiporol
+ADD
+  CONSTRAINT pk_tiporol PRIMARY KEY (id_tiporol);
+
+CREATE SEQUENCE TIPOROL_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOROL BEFORE
+INSERT
+  ON TIPOROL FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOROL_SEQ.NEXTVAL INTO :NEW.ID_TIPOROL
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOSENSOR--
+CREATE TABLE tiposensor (
+  descripcion VARCHAR2(100 CHAR),
+  id_tiposensor NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tiposensor ON tiposensor (id_tiposensor ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tiposensor
+ADD
+  CONSTRAINT id_tiposensor_ck CHECK (id_tiposensor > 0);
+
+ALTER TABLE
+  tiposensor
+ADD
+  CONSTRAINT pk_tiposensor PRIMARY KEY (id_tiposensor);
+
+CREATE SEQUENCE TIPOSENSOR_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOSENSOR BEFORE
+INSERT
+  ON TIPOSENSOR FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOSENSOR_SEQ.NEXTVAL INTO :NEW.ID_TIPOSENSOR
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOSERVOMOTOR--
+CREATE TABLE tiposervomotor (
+  marca VARCHAR2(100 CHAR),
+  modelo VARCHAR2(100 CHAR),
+  potencia NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  velocidad_max NUMBER,
+  id_tiposervomotor NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tiposervomotor ON tiposervomotor (id_tiposervomotor ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tiposervomotor
+ADD
+  CONSTRAINT id_tiposervomotor_ck CHECK (id_tiposervomotor > 0);
+
+ALTER TABLE
+  tiposervomotor
+ADD
+  CONSTRAINT potencia_ckk CHECK (potencia > 0);
+
+ALTER TABLE
+  tiposervomotor
+ADD
+  CONSTRAINT velocidad_max_ck CHECK (velocidad_max > 0);
+
+ALTER TABLE
+  tiposervomotor
+ADD
+  CONSTRAINT pk_tiposervomotor PRIMARY KEY (id_tiposervomotor);
+
+CREATE SEQUENCE TIPOSERVOMOTOR_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOSERVOMOTOR BEFORE
+INSERT
+  ON TIPOSERVOMOTOR FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOSERVOMOTOR_SEQ.NEXTVAL INTO :NEW.ID_TIPOSERVOMOTOR
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--TIPOTEMPERATURA--
+CREATE TABLE tipotemperatura (
+  fabricante VARCHAR2(100 CHAR),
+  num_serie NUMBER,
+  rango_medicion NUMBER,
+  descripcion VARCHAR2(100 CHAR),
+  id_tipotemperatura NUMBER NOT NULL
+) TABLESPACE DATOS;
+
+CREATE UNIQUE INDEX pk_tipotemperatura ON tipotemperatura (id_tipotemperatura ASC) TABLESPACE INDX;
+
+ALTER TABLE
+  tipotemperatura
+ADD
+  CONSTRAINT id_tipotemperatura_ck CHECK (id_tipotemperatura > 0);
+
+ALTER TABLE
+  tipotemperatura
+ADD
+  CONSTRAINT num_serie_ck1 CHECK (num_serie > 0);
+
+ALTER TABLE
+  tipotemperatura
+ADD
+  CONSTRAINT rango_medicion_ck1 CHECK (rango_medicion > 0);
+
+ALTER TABLE
+  tipotemperatura
+ADD
+  CONSTRAINT pk_tipotemperatura PRIMARY KEY (id_tipotemperatura);
+
+CREATE SEQUENCE TIPOTEMPERATURA_SEQ INCREMENT BY 1 START WITH 1 MAXVALUE 99999999999999999999 MINVALUE 1 NOCACHE ORDER;
+
+CREATE
+OR REPLACE TRIGGER TIB_TIPOTEMPERATURA BEFORE
+INSERT
+  ON TIPOTEMPERATURA FOR EACH ROW DECLARE BEGIN
+SELECT
+  TIPOTEMPERATURA_SEQ.NEXTVAL INTO :NEW.ID_TIPOTEMPERATURA
+FROM
+  DUAL;
+
+END;
+
+/;
+
+--RESTO DEL CODIDO--
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT fk_casa_espacio FOREIGN KEY (cve_casa) REFERENCES casa (id_casa) NOT DEFERRABLE;
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT fk_casa_persona FOREIGN KEY (cve_casa) REFERENCES casa (id_casa) NOT DEFERRABLE;
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT fk_casa_registroacceso FOREIGN KEY (cve_casa) REFERENCES casa (id_casa) NOT DEFERRABLE;
+
+ALTER TABLE
+  cp
+ADD
+  CONSTRAINT fk_colonia_cp FOREIGN KEY (cve_colonia) REFERENCES colonia (id_colonia) NOT DEFERRABLE;
+
+--  ERROR: FK name length exceeds maximum allowed length(30) 
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT fk_controlparental_controltiporol FOREIGN KEY (cve_controlparental) REFERENCES controlparental (id_controlparental) NOT DEFERRABLE;
+
+ALTER TABLE
+  direccion
+ADD
+  CONSTRAINT fk_cp_direccion FOREIGN KEY (cve_cp) REFERENCES cp (id_cp) NOT DEFERRABLE;
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT fk_direccion_casa FOREIGN KEY (cve_direccion) REFERENCES direccion (id_direccion) NOT DEFERRABLE;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT fk_espacio_dispositivo FOREIGN KEY (cve_espacio) REFERENCES espacio (id_espacio) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_espacio_sensor FOREIGN KEY (cve_espacio) REFERENCES espacio (id_espacio) NOT DEFERRABLE;
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT fk_lada_telefono FOREIGN KEY (cve_lada) REFERENCES lada (id_lada) NOT DEFERRABLE;
+
+ALTER TABLE
+  colonia
+ADD
+  CONSTRAINT fk_municipio_colonia FOREIGN KEY (cve_municipio) REFERENCES municipio (id_municipio) NOT DEFERRABLE;
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT fk_nombre_persona FOREIGN KEY (cve_nombre) REFERENCES nombre (id_nombre) NOT DEFERRABLE;
+
+ALTER TABLE
+  registroacceso
+ADD
+  CONSTRAINT fk_persona_registroacceso FOREIGN KEY (cve_persona) REFERENCES persona (id_persona) NOT DEFERRABLE;
+
+ALTER TABLE
+  telefono
+ADD
+  CONSTRAINT fk_persona_telefono FOREIGN KEY (cve_persona) REFERENCES persona (id_persona) NOT DEFERRABLE;
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT fk_red_casa FOREIGN KEY (cve_red) REFERENCES red (id_red) NOT DEFERRABLE;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT fk_tipoalarma_dispositivo FOREIGN KEY (cve_tipoalarma) REFERENCES tipoalarma (id_tipoalarma) NOT DEFERRABLE;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT fk_tipodispositivo_dispositivo FOREIGN KEY (cve_tipodispositivo) REFERENCES tipodispositivo (id_tipodispositivo) NOT DEFERRABLE;
+
+ALTER TABLE
+  espacio
+ADD
+  CONSTRAINT fk_tipoespacio_espacio FOREIGN KEY (cve_tipoespacio) REFERENCES tipoespacio (id_tipoespacio) NOT DEFERRABLE;
+
+ALTER TABLE
+  lada
+ADD
+  CONSTRAINT fk_tipoestado_lada FOREIGN KEY (cve_tipoestado) REFERENCES tipoestado (id_tipoestado) NOT DEFERRABLE;
+
+ALTER TABLE
+  municipio
+ADD
+  CONSTRAINT fk_tipoestado_municipio FOREIGN KEY (cve_tipoestado) REFERENCES tipoestado (id_tipoestado) NOT DEFERRABLE;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT fk_tipofoco_dispositivo FOREIGN KEY (cve_tipofoco) REFERENCES tipofoco (id_tipofoco) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_tipogas_sensor FOREIGN KEY (cve_tipogas) REFERENCES tipogas (id_tipogas) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_tipohumedad_sensor FOREIGN KEY (cve_tipohumedad) REFERENCES tipohumedad (id_tipohumedad) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_tipoluz_sensor FOREIGN KEY (cve_tipoluz) REFERENCES tipoluz (id_tipoluz) NOT DEFERRABLE;
+
+ALTER TABLE
+  tipoestado
+ADD
+  CONSTRAINT fk_tipopais_tipoestado FOREIGN KEY (cve_tipopais) REFERENCES tipopais (id_tipopais) NOT DEFERRABLE;
+
+ALTER TABLE
+  casa
+ADD
+  CONSTRAINT fk_tipopropiedad_casa FOREIGN KEY (cve_tipopropiedad) REFERENCES tipopropiedad (id_tipopropiedad) NOT DEFERRABLE;
+
+ALTER TABLE
+  controltiporol
+ADD
+  CONSTRAINT fk_tiporol_controltiporol FOREIGN KEY (cve_tiporol) REFERENCES tiporol (id_tiporol) NOT DEFERRABLE;
+
+ALTER TABLE
+  persona
+ADD
+  CONSTRAINT fk_tiporol_persona FOREIGN KEY (cve_tiporol) REFERENCES tiporol (id_tiporol) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_tiposensor_sensor FOREIGN KEY (cve_tiposensor) REFERENCES tiposensor (id_tiposensor) NOT DEFERRABLE;
+
+ALTER TABLE
+  dispositivo
+ADD
+  CONSTRAINT fk_tiposervomotor_dispositivo FOREIGN KEY (cve_tiposervomotor) REFERENCES tiposervomotor (id_tiposervomotor) NOT DEFERRABLE;
+
+ALTER TABLE
+  sensor
+ADD
+  CONSTRAINT fk_tipotemperatura_sensor FOREIGN KEY (cve_tipotemperatura) REFERENCES tipotemperatura (id_tipotemperatura) NOT DEFERRABLE;

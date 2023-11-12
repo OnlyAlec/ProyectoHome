@@ -35,25 +35,28 @@ app = Flask(__name__)
 CORS(app)
 
 
-@app.route("/v1.0/db", methods=["GET", "POST"])
-def mainGETDB():
+@app.route("/v1.0/dbsql", methods=["GET", "POST"])
+def mainSQL():
     app.logger.info('Init request!')
     req = Request(request.json if request.is_json else request.args)
     if miss := req.validateRequest(request.method):
         return req.respondServer(("error", miss), 400)
-    if req.db == "SQL":
-        try:
-            db = DB()
-            reqOp = Operation(db, req.crud, req.data)
-            app.logger.info('Return request!')
-            return req.respondServer(("OK", reqOp.response), 200)
-        except Exception as e:
-            if isinstance(e, (OperationalError, DatabaseError)):
-                app.logger.error(e.args[0].message)
-                return req.respondServer(("error", e.args[0].message), 500)
-            app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
-            return req.respondServer(("error", e.args[0]), 500)
-    # elif req.db == "NOSQL":
-    # db = dbNSQL.DB()
+    try:
+        db = DB()
+        reqOp = Operation(db, req.crud, req.data)
+        app.logger.info('Return request!')
+        return req.respondServer(("OK", reqOp.response), 200)
+    except Exception as e:
+        if isinstance(e, (OperationalError, DatabaseError)):
+            app.logger.error(e.args[0].message)
+            return req.respondServer(("error", e.args[0].message), 500)
+        app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
+        return req.respondServer(("error", e.args[0]), 500)
     app.logger.critical('Client end up here! Problem with structure!')
     return "Que haces aqui? Hablale a Alec!"
+
+
+@app.route("/v1.0/dbnsql", methods=["GET", "POST"])
+def mainNOSQL():
+    print(request.json)
+    return "OK"

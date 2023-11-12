@@ -250,8 +250,7 @@ class Operation:
                         raise ValueError(
                             f"Column {columnName} not exist in table {tableName}!")
 
-    def getIDChild(self, table: Table, indexColumn: int):
-        nameColumn = table.columns[indexColumn]
+    def getIDChild(self, nameColumn: str):
         if nameColumn.find("CVE_") == -1:
             return None
 
@@ -265,19 +264,22 @@ class Operation:
             raise e
 
     def insert(self, table: Table):
-        query = f"INSERT INTO {table.table} VALUES ("
-        for column, values in enumerate(table.values):
+        query = f"INSERT INTO {table.table}("
+        valuesQuery = " VALUES("
+        for column, values in zip(table.columns, table.values):
+            query += f"{column}, "
             if isinstance(values, str):
-                query += f"'{values}', "
+                valuesQuery += f"'{values}', "
             elif isinstance(values, int):
-                query += f"{values}, "
+                valuesQuery += f"{values}, "
             else:
-                ID = self.getIDChild(table, column)
+                ID = self.getIDChild(column)
                 if ID is None:
-                    query += "NULL, "
+                    valuesQuery += "NULL, "
                 else:
-                    query += f"{ID}, "
-        query = query[:-2] + ")"
+                    valuesQuery += f"{ID}, "
+        valuesQuery = valuesQuery[:-2] + ")"
+        query = query[:-2] + ")" + valuesQuery
         try:
             print("Inserting...", end=" ")
             self.db.cursor.execute(query)
