@@ -190,6 +190,8 @@ class Operation:
 
                 if childName in self.tablesWaiting:
                     indexPos = self.tablesWaiting.index(table)
+                    if self.tablesWaiting.index(childName) < indexPos:
+                        continue
                     self.tablesWaiting.remove(childName)
                     self.tablesWaiting.insert(indexPos, childName)
                     order = True
@@ -222,8 +224,9 @@ class Operation:
 
             for table in self.tablesObj:
                 getattr(self, self.crud.lower())(table)
-                self.db.connection.commit()
+            self.db.connection.commit()
         except (oracledb.DatabaseError, ValueError) as e:
+            self.db.connection.rollback()
             raise e
 
     def checkValidation(self, tableClass: Table):

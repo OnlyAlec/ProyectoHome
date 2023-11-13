@@ -7,7 +7,6 @@ from flask_cors import CORS
 
 class Request:
     def __init__(self, dRequest):
-        self.db = dRequest.get("db")
         self.crud = dRequest.get("crud")
         self.data = dRequest.get("data")
 
@@ -18,8 +17,6 @@ class Request:
             return "Invalid CRUD"
         if method == "GET" and self.crud not in ["SELECT"]:
             return "Invalid CRUD"
-        if self.db not in ["SQL", "NOSQL"]:
-            return "Invalid DB"
         if not self.data:
             return "Not Data"
 
