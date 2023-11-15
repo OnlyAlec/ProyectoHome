@@ -1,19 +1,15 @@
 import socket
-import selectors
 import json
 import sys
 import struct
-import io
-import traceback
-import queue
+from main import actions
 
-q = queue.Queue()
 pending_messages = []
+kill = False
 
 
 class Connection:
-    def __init__(self, selector, sock, addr):
-        self.selector = selector
+    def __init__(self, sock, addr):
         self.sock: socket.socket = sock
         self.addr = addr
         self.jsonHeader = None
@@ -24,29 +20,29 @@ class Connection:
     def _read(self):
         try:
             data = self.sock.recv(4096)
-        except BlockingIOError:
+        except OSError:
+            print("\n\n!!! ERROR READ -> \t\n\n", sys.exc_info()[0])
             pass
         else:
             if data:
-                # print("-> Adding data to buffer...")
                 self._buffer += data
             else:
-                raise RuntimeError("!!! Client closed connection")
+                raise RuntimeError("!!! Server closed connection")
 
     def write(self):
         while pending_messages:
-            print("\t▣ Sending data...", end=" ")
+            print("\t# Sending data...", end=" ")
             message = pending_messages.pop()
             try:
                 self.sock.send(message)
                 print("\tOK!")
-            except BlockingIOError:
-                pending_messages.insert(0, message)
-                break
+            except OSError as e:
+                print("\tFailed!\n")
+                raise RuntimeError("!!! Server closed connection")
 
     def read(self):
-        print("\t▣ Getting data...", end=" ")
-
+        print("\t# Getting data...", end=" ")
+        self._resetParams()
         self._read()
 
         if self._lenJSON is None:
@@ -73,12 +69,7 @@ class Connection:
         return json.dumps(obj).encode("utf-8")
 
     def _decodeJSON(self, bytesJSON):
-        tiow = io.TextIOWrapper(
-            io.BytesIO(bytesJSON), encoding="utf-8", newline=""
-        )
-        obj = json.load(tiow)
-        tiow.close()
-        return obj
+        return json.loads(bytesJSON)
 
     def _createMessage(self, *, content_bytes):
         jsonHeader = {
@@ -119,94 +110,71 @@ class Connection:
         contLen = self.jsonHeader["content-length"]
 
         if not len(self._buffer) >= contLen:
-            print("\tFailed -> Not Same JSON Len!")
+            print("\tFailed -> Not Same Len!")
             return
         data = self._buffer[:contLen]
         self._buffer = self._buffer[contLen:]
-        self.request = self._decodeJSON(data)
-        q.put(self.request)
-        self._resetParams()
+        self.request: dict = self._decodeJSON(data)
         print("\tOK!")
 
     def close(self):
         print(f"Closing connection to {self.addr}")
         try:
-            self.selector.unregister(self.sock)
-        except Exception as e:
-            print(f"!!! ERROR selector.unregister() -> \t {e!r}")
-
-        try:
             self.sock.close()
         except OSError as e:
-            print(f"!!! ERROR socket.close() -> \t {e!r}")
-
-
-def initConnectPico():
-    print('Listening for PICO...', end=" ")
-    sel = selectors.DefaultSelector()
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("0.0.0.0", 8080))
-    s.listen()
-
-    sel.register(s, selectors.EVENT_READ)
-    conn, addr = s.accept()
-    print(f'\tOK!:  {addr}')
-
-    conn.setblocking(False)
-    m = Connection(sel, conn, addr)
-    sel.register(conn, selectors.EVENT_READ, data=m)
-    return m
+            print(f"Error: socket.close() exception for {self.addr}: {e!r}")
+        sys.exit()
 
 
 def initConnectRPI(host, port):
     print("Connecting to RPI...", end=" ")
     addr = (host, port)
-    sel = selectors.DefaultSelector()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.connect_ex(addr)
+        s.connect(addr)
         print(f'\tOK!:  {addr}')
     except OSError as e:
-        print(f'\tFailed!: {e}')
+        print(f'\n\tFailed!: {e}')
         sys.exit()
 
-    m = Connection(sel, s, addr)
-    sel.register(s, selectors.EVENT_WRITE, data=m)
+    m = Connection(s, addr)
     return m
 
 
-def listenerWorker(conn: Connection, qRecv):
-    global q
-    q = qRecv
+def listenerWorker(conn: Connection):
+    print(f"Starting listener...")
+    while True:
+        try:
+            print("Listening...", end=" ")
+            conn.read()
+            data: dict = conn.request
+            print(f"\t* Action: {data['function']} -> {data['args']}")
+            actions(data["function"], data["args"])
+        except Exception as e:
+            print(f"\n\n!!! ERROR LISTENER -> \t {e}\n\n")
+            conn.close()
+            break
 
-    try:
-        while True:
-            events = conn.selector.select()
-            for key, mask in events:
-                message: Connection = key.data
-                try:
-                    message.read()
-                except Exception:
-                    print(
-                        f"!!! ERROR LISTENER -> \t"
-                        f"{traceback.format_exc()}"
-                    )
-                    message.close()
-    finally:
-        conn.selector.close()
-        sys.exit()
+    global kill
+    kill = True
+    print("Killing listener :(...")
+    sys.exit()
 
 
 def senderWorker(conn: Connection, sensorData):
+    global kill
+    if kill is True:
+        print("Killing sender...")
+        sys.exit()
+
+    sensorData = {"data": sensorData}
     request = {"content": sensorData}
     conn.queue_request(request)
     try:
         conn.write()
-    except Exception:
-        print(f"!!! ERROR SENDER -> \t"
-              f"{traceback.format_exc()}")
+        return
+    except Exception as e:
+        print(f"\n\n!!! ERROR SENDER -> \t {e}\n\n")
+        kill = True
         conn.close()
-        sys.exit()
-    if not conn.selector.get_map():
-        conn.close()
-        sys.exit()
+    print("Ending sender :(...")

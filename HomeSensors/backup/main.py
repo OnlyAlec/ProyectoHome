@@ -5,20 +5,46 @@ from machine import Pin, PWM, ADC
 import utime
 import network
 # from mfrc522 import MFRC522
+
 import libConnectPico
+from libSensors import MQ2
 
 # ----------------------------------
 # Pin de sensores
 # ----------------------------------
-ECHO = Pin(3, Pin.IN)
-TRIG = Pin(4, Pin.OUT)
-IR = Pin(28, Pin.IN)
-# READER = MFRC522(spi_id=21, sck=20, miso=18, mosi=19, cs=17, rst=16)
-SERVO_1 = Pin(22, Pin.OUT)
-LED_1 = Pin(15, Pin.OUT)
-LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))
+# JARDIN ---------------------------
+LED_JARDIN = Pin(4, Pin.OUT)
+LUZ = Pin(5, Pin.IN)
+HUMEDAD = ADC(28)
+
+# COCINA ---------------------------
+BUZZER_COCINA = Pin(6, Pin.OUT)
+LED_COCINA = Pin(7, Pin.OUT)
+GAS = MQ2(27)
+
+
+# HABITACION ---------------------------
+SERVO_HABITACION = Pin(8, Pin.OUT)
+PWM_SERVO_HABITACION = PWM(SERVO_HABITACION)
+LED_HABITACION = Pin(9, Pin.OUT)
 TEMP = ADC(26)
 
+# GARAGE ---------------------------
+LED_GAAAGE = Pin(10, Pin.OUT)
+SERVO_GARAGE = Pin(11, Pin.OUT)
+PWM_SERVO_GARAGE = PWM(SERVO_GARAGE)
+
+
+# ENTRADA ---------------------------
+IR = Pin(13, Pin.IN)
+BUZZER_ENTRADA = Pin(14, Pin.OUT)
+LED_ENTRADA = Pin(15, Pin.OUT)
+# Checar lib
+RFID = [Pin(16, Pin.IN), Pin(17, Pin.IN), Pin(18, Pin.IN),
+        Pin(19, Pin.IN), Pin(20, Pin.IN), Pin(21, Pin.IN)]
+
+# OTROS ---------------------------
+LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))  # Listo
 
 # ----------------------------------
 # Globales
@@ -67,42 +93,64 @@ def connectServer(host, port):
 # ----------------------------------
 # Funciones sensores
 # ----------------------------------
-def sensorUltrasonico():
-    inicio = 0
-    fin = 0
+def ledAction(led, state):
+    if state == "ON":
+        led.value(1)
+    else:
+        led.value(0)
 
-    TRIG.low()
-    utime.sleep_us(2)
 
-    TRIG.high()
-    utime.sleep_us(10)
+def sensorGas():
+    read = GAS.__readRs__()
+    # print("Gas: " + str(read))
+    return Sensor("Gas", {"valueAnalog": read, "ro": GAS.ro})
 
-    TRIG.low()
 
-    while ECHO.value() == 0:
-        inicio = utime.ticks_us()
-    while ECHO.value() == 1:
-        fin = utime.ticks_us()
+def sensorHumedad():
+    # print("Humedad: " + str(HUMEDAD.read_u16()))
+    return Sensor("Humedad", {"valueAnalog": HUMEDAD.read_u16()})
 
-    return Sensor("Ultrasonico", {"inicio": inicio, "fin": fin})
+
+def sensorRFID():
+    #! TODO: Checar la libreria
+    print("Libreria")
+
+
+def sensorLuz():
+    light = "False" if LUZ.value() == 1 else "True"
+    # print("Luz: " + light)
+    return Sensor("Luz", {"status": light})
 
 
 def sensorIR():
     irValue: str = "False" if IR.value() == 1 else "True"
-    Sensor("IR", {"status": irValue})
+    # print("IR: " + irValue)
     return Sensor("IR", {"status": irValue})
 
 
 def sensorTemp():
-    utime.sleep(2)
     valueAnalog = TEMP.read_u16()
+    # print("Temperatura: " + str(valueAnalog))
     return Sensor("Temperatura", {"valueAnalog": valueAnalog})
 
 
 # ----------------------------------
 # Funciones acciones
 # ----------------------------------
-def openDoor(**kwargs):
+def ledChange(**kwargs):
+    state = kwargs["state"]
+    led = globals()[kwargs["led"]]
+    print(f"\t\t # LED: {led} -> {state}")
+    if state == "ON" and led.value() == 0:
+        led.on()
+        return True
+    if state == "OFF" and led.value() == 1:
+        led.off()
+        return True
+    return False
+
+
+def servoAction(**kwargs):
     state = kwargs["state"]
     servo = globals()[kwargs["servo"]]
     pwmServo = PWM(servo)
@@ -115,26 +163,30 @@ def openDoor(**kwargs):
     return True
 
 
-def ledChange(**kwargs):
+def buzzerAction(**kwargs):
+    buzzer = globals()[kwargs["servo"]]
     state = kwargs["state"]
-    led = globals()[kwargs["led"]]
+    time = kwargs.get("time")
 
-    if state == "ON" and led.value() == 0:
-        led.on()
-        return True
-    if state == "OFF" and led.value() == 1:
-        led.off()
-        return True
-    return False
+    if state == "ON":
+        buzzer.on()
+        utime.sleep(time)
+        buzzer.off()
+    else:
+        buzzer.off()
 
 
 def actions(strFunction: str, kwargs: dict):
     actionsToDo = {
-        "openDoor": openDoor,
-        "ledChange": ledChange
+        "ledChange": ledChange,
+        "servoAction": servoAction,
+        "buzzerAction": buzzerAction
     }
-    status = actionsToDo[strFunction](**kwargs)
-    print(f"\t\t # Status Action: {status}")
+    try:
+        status = actionsToDo[strFunction](**kwargs)
+        print(f"\t\t # Status Action: {status}")
+    except (Exception, KeyError):
+        print(f"\t\t # Function: {strFunction} not found!")
 
 
 # ----------------------------------
@@ -142,17 +194,24 @@ def actions(strFunction: str, kwargs: dict):
 # ----------------------------------
 def recolectData():
     data = []
+    i=0
     while True:
-        # data.append(sensorUltrasonico())
-        data.append(sensorIR())
-        # Los demas datos de otros sensores aqui
+        data.append(sensorLuz().toDict())
+        data.append(sensorHumedad().toDict())
+        data.append(sensorIR().toDict())
+        data.append(sensorTemp().toDict())
+        data.append(sensorGas().toDict())
+        # data.append(sensorRFID())
 
-        d: Sensor
-        for i, d in enumerate(data):
-            print(f"■ {i+1} Sensor: {d.sensorName}", end="\n\n")
-            libConnectPico.senderWorker(server, d.toDict())
+        print(f"{i} Preparing data...")
+        libConnectPico.senderWorker(server, data)
+        i+=1
+        # d: Sensor
+        # for i, d in enumerate(data):
+        #     print(f"■ {i+1} Sensor: {d.sensorName}")
+        #     libConnectPico.senderWorker(server, d.toDict())
         data = []
-        utime.sleep(1.5)
+        utime.sleep_ms(2000)
 
 
 def initStatusLED(wlan, mode: int = 0):
@@ -197,11 +256,14 @@ if __name__ == '__main__':
     print("Init program...")
     LED_BICOLOR[1].value(0)
     LED_BICOLOR[0].value(0)
+    GAS.calibrate()
+
     try:
-        server = connectServer(host="200.10.0.6", port=8080)
-        # server = connectServer(host="192.168.191.1", port=8080)
+        server = connectServer(host="200.10.0.11", port=8080)
         initStatusLED(None, 1)
     except (OSError) as e:
+        LED_BICOLOR[1].value(0)
+        LED_BICOLOR[0].value(0)
         print("Error! -> ", e)
         sys.exit()
 
