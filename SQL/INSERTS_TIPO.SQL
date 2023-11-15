@@ -2,52 +2,52 @@
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(1, 'Estados Unidos');
+  (1, 'Estados Unidos');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(2, 'México');
+  (2, 'México');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(3, 'Canadá');
+  (3, 'Canadá');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(4, 'Guatemala');
+  (4, 'Guatemala');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(5, 'Belice');
+  (5, 'Belice');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(6, 'Honduras');
+  (6, 'Honduras');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(7, 'Salvador');
+  (7, 'Salvador');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(8, 'Costa Rica');
+  (8, 'Costa Rica');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(9, 'Colombia');
+  (9, 'Colombia');
 
 INSERT INTO
   Tipopais(id_tipopais, descripcion)
 values
-(10, 'Ecuador');
+  (10, 'Ecuador');
 
 ---------------------------Estados------------------------------------------
 INSERT INTO
@@ -591,8 +591,9 @@ INSERT INTO
 VALUES
   (11, 722, 65);
 
--- tipoEstado de México
-tipoINSERT INTO tipoLada (ID_lada, codigo, cve_tipoestado)
+-- Estado de México
+INSERT INTO
+  Lada (ID_lada, codigo, cve_tipoestado)
 VALUES
   (12, 477, 61);
 

@@ -1,6 +1,5 @@
 import os
 
-from pyparsing import col
 import json
 import oracledb
 from dotenv import load_dotenv
@@ -27,7 +26,9 @@ class Table:
             if column == "alias":
                 self.alias = value
             elif column == "where":
-                self.where = value
+                campo: str = value.split("=")[0].strip()
+                cond: str = value.split("=")[1].strip()
+                self.where = f"{campo}='{cond}'"
             elif column == "query":
                 # !Puede que solo me manden el query ya hecho pero no sabemos
                 table = Table(self.table, value)
@@ -108,10 +109,15 @@ class DB:
             raise e
 
     def getAllTables(self):
-        self.cursor.execute("SELECT table_name FROM user_tables")
+        self.cursor.execute(
+            "SELECT TABLE_NAME FROM all_tables WHERE OWNER = 'SOFIDBA_02'")
         self.allTables = [
             table[0] for table in self.cursor.fetchall()
         ]
+        self.cursor.execute(
+            "SELECT VIEW_NAME FROM ALL_VIEWS WHERE OWNER = 'SOFIDBA_02'")
+        for table in self.cursor.fetchall():
+            self.allTables.append(table[0])
 
     def existColumn(self, table: str, column: str):
         try:
@@ -129,7 +135,7 @@ class Operation:
         self.data = data
         self.tablesWaiting: list = []
         self.tablesObj: list = []
-        self.response: list = []
+        self.response: list | dict = []
 
         try:
             self.getTables()
@@ -209,6 +215,7 @@ class Operation:
             self.tablesObj = newOrder
 
     def execute(self):
+        responses = {}
         try:
             if self.crud == "SELECT" and isinstance(self.data, str):
                 self.db.cursor.execute(self.data)
@@ -223,8 +230,10 @@ class Operation:
                 self.orderTables(table)
 
             for table in self.tablesObj:
-                getattr(self, self.crud.lower())(table)
+                resp = getattr(self, self.crud.lower())(table)
+                responses.update({table.table: resp})
             self.db.connection.commit()
+            self.response = responses
         except (oracledb.DatabaseError, ValueError) as e:
             self.db.connection.rollback()
             raise e
@@ -258,7 +267,7 @@ class Operation:
             return None
 
         nameColumn = nameColumn.split("_")[1]
-        query = f"SELECT MAX(ID_{nameColumn}) FROM {nameColumn}"
+        query = f"SELECT MAX(ID_{nameColumn}) FROM  SOFIDBA_02.{nameColumn}"
         try:
             self.db.cursor.execute(query)
             ID = self.db.cursor.fetchone()[0]
@@ -267,7 +276,7 @@ class Operation:
             raise e
 
     def insert(self, table: Table):
-        query = f"INSERT INTO {table.table}("
+        query = f"INSERT INTO SOFIDBA_02.{table.table}("
         valuesQuery = " VALUES("
         for column, values in zip(table.columns, table.values):
             query += f"{column}, "
@@ -293,10 +302,8 @@ class Operation:
             raise e
 
     def update(self, table: Table):
-        query = f"UPDATE {table.table} SET "
+        query = f"UPDATE SOFIDBA_02.{table.table} SET "
         for column, values in zip(table.columns, table.values):
-            if column == "condition":
-                continue
             if isinstance(values, str):
                 query += f"{column}='{values}', "
             elif isinstance(values, int):
@@ -307,13 +314,14 @@ class Operation:
             print("Updating...", end=" ")
             self.db.cursor.execute(query)
             print("OK!")
+            return self.db.cursor.rowcount if self.db.cursor.rowcount > 0 else "Not modified!"
         except oracledb.DatabaseError as e:
             e.args[0].message = f"{
                 e.args[0].message} en tabla {table.table}"
             raise e
 
     def delete(self, table: Table):
-        query = f"DELETE FROM {table.table} WHERE {table.where}"
+        query = f"DELETE FROM SOFIDBA_02.{table.table} WHERE {table.where}"
         try:
             print("Deleting...", end=" ")
             self.db.cursor.execute(query)
