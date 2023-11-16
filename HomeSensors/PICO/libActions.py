@@ -1,4 +1,4 @@
-import utime
+from machine import PWM
 import config
 
 
@@ -19,23 +19,21 @@ def ledChange(**kwargs):
 def servoAction(**kwargs):
     state = kwargs["state"]
     servo = getattr(config, kwargs["servo"])
-    servo.freq(50)
+    pwmServo = PWM(servo)
+    pwmServo.freq(50)
 
     if state == "ON":
-        servo.duty_u16(8000)
+        pwmServo.duty_u16(8000)
     else:
-        servo.duty_u16(2000)
+        pwmServo.duty_u16(2000)
     return True
 
 
 def buzzerAction(**kwargs):
-    buzzer = globals()[kwargs["servo"]]
-    state = getattr(config, kwargs["state"])
-    time = kwargs.get("time")
+    buzzer = getattr(config, kwargs["buzzer"])
+    state = kwargs["state"]
 
     if state == "ON":
         buzzer.on()
-        utime.sleep(time)
-        buzzer.off()
     else:
         buzzer.off()

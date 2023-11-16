@@ -2,7 +2,7 @@ from machine import Pin, PWM, ADC
 from libSensors import MQ2
 
 # JARDIN ---------------------------
-LED_JARDIN_HUMEDAD = Pin(2, Pin.OUT)
+LED_JARDIN = Pin(2, Pin.OUT)
 LED_JARDIN_LUZ = Pin(4, Pin.OUT)
 LUZ = ADC(26)
 HUMEDAD = ADC(28)
@@ -15,15 +15,13 @@ GAS = MQ2(pinData=27, baseVoltage=3.3)
 
 # HABITACION ---------------------------
 SERVO_HABITACION = Pin(8, Pin.OUT)
-PWM_SERVO_HABITACION = PWM(SERVO_HABITACION)
 LED_HABITACION = Pin(9, Pin.OUT)
 TEMP = ADC(4)
 
 # GARAGE ---------------------------
-LED_GAAAGE = Pin(10, Pin.OUT)
+LED_GARAGE = Pin(10, Pin.OUT)
 SERVO_GARAGE = Pin(11, Pin.OUT)
-PWM_SERVO_GARAGE = PWM(SERVO_GARAGE)
-
+BUZZER_GARAGE = Pin(12, Pin.OUT)
 
 # ENTRADA ---------------------------
 IR = Pin(13, Pin.IN)
