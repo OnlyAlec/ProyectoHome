@@ -1,5 +1,12 @@
-# include "MQ2.h"
-# Ported from https://github.com/amperka/TroykaMQ
-# Author: Alexey Tveritinov [kartun@yandex.ru]
-from testbase import BaseMQ
-from micropython import const
+from machine import Pin
+import utime
+
+
+LED_JARDIN = Pin(2, Pin.OUT)
+
+
+while True:
+    LED_JARDIN.value(1)
+    utime.sleep_ms(100)
+    LED_JARDIN.value(0)
+    utime.sleep_ms(100)
