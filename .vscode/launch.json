@@ -11,10 +11,15 @@
       },
       "args": [
         "run",
-        "--no-debugger"
+        "--no-debugger",
+        "--host",
+        "200.10.0.1",
+        "--port",
+        "8080"
       ],
       "jinja": true,
-      "justMyCode": true
+      "justMyCode": true,
+      "cwd": "${fileDirname}"
     },
     {
       "name": "Python: File",
