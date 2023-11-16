@@ -22,7 +22,7 @@ class Sensor:
 
 class BaseMQ(object):
     MQ_SAMPLE_TIMES = const(5)
-    MQ_SAMPLE_INTERVAL = const(500)
+    MQ_SAMPLE_INTERVAL = const(100)
     MQ_HEATING_PERIOD = const(60000)
     MQ_COOLING_PERIOD = const(90000)
     STRATEGY_FAST = const(1)
@@ -167,10 +167,10 @@ class MQ2(BaseMQ):
 # ----------------------------------
 def gas(sensor: MQ2):
     return Sensor("Gas", {
-        "Smoke": sensor.readSmoke(),
-        "LPG": sensor.readLPG(),
+        # "Smoke": sensor.readSmoke(),
+        # "LPG": sensor.readLPG(),
         "Methane": sensor.readMethane(),
-        "Hydrogen": sensor.readHydrogen()
+        # "Hydrogen": sensor.readHydrogen()
     })
 
 

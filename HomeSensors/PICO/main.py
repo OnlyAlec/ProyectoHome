@@ -1,7 +1,7 @@
 import sys
 import _thread
 
-from machine import Pin, PWM, ADC
+from machine import Pin, PWM
 import utime
 import network
 from micropython import const
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     getattr(config, "GAS").calibrate()
 
     try:
-        server = connectServer(host="200.10.0.11", port=8080)
+        server = connectServer(host="200.10.0.15", port=8080)
         # server = connectServer(host="192.168.191.1", port=8080)
         initStatusLED(None, 1)
     except (OSError) as e:
