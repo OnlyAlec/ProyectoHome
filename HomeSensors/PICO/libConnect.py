@@ -30,7 +30,7 @@ class Connection:
         self.responseCreated = False
         self.jsonHeader: dict = {}
         self.request: dict = {}
-        self.mask = 0
+        self.mask = EVENT_WRITE
         self._lenJSON: int = 0
         self._buffer = b""
         self._sendBuffer = b""
@@ -90,7 +90,7 @@ class Connection:
     def _read(self):
         try:
             data = self.sock.recv(4096)
-        except BlockingIOError:
+        except OSError:
             print("\n\n!!! ERROR READ -> \t\n\n", sys.exc_info()[0])
         else:
             if data:
@@ -139,10 +139,9 @@ class Connection:
 
     def _write(self):
         if self._sendBuffer:
-            print(f"Sending {self._sendBuffer!r} to {self.addr}")
             try:
                 sent = self.sock.send(self._sendBuffer)
-            except BlockingIOError:
+            except OSError:
                 pass
             else:
                 self._sendBuffer = self._sendBuffer[sent:]
@@ -167,7 +166,7 @@ class Connection:
 class senderListener:
     def __init__(self, conn: Connection, qRecv):
         self.conn = conn
-        self.queueAPI: list = qRecv
+        self.queueAPI: dict = qRecv
         self.dataIn: dict = {}
         self.dataOut: list = []
 
@@ -176,9 +175,7 @@ class senderListener:
         if mask == EVENT_READ:
             print("\t▣ Getting data...", end=" ")
             self.dataIn = self.conn.read()
-            print(self.dataIn)
             self.queueAPI.append(self.dataIn)
-            print(self.queueAPI)
             self.conn.changeMask(EVENT_WRITE)
             print("OK!\n")
             return True

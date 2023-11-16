@@ -1,6 +1,7 @@
 from machine import ADC
 from micropython import const
 import utime
+from math import exp, log
 
 
 # ----------------------------------
@@ -19,34 +20,70 @@ class Sensor:
         }
 
 
-class MQ2():
+class BaseMQ(object):
     MQ_SAMPLE_TIMES = const(5)
-    MQ_CALIBRATION_INTERVAL = const(3000)
-    MQ_SAMPLE_INTERVAL = const(20)
-    MQ2_RO_BASE = float(9.83)
+    MQ_SAMPLE_INTERVAL = const(500)
+    MQ_HEATING_PERIOD = const(60000)
+    MQ_COOLING_PERIOD = const(90000)
+    STRATEGY_FAST = const(1)
+    STRATEGY_ACCURATE = const(2)
 
-    def __init__(self, pinData, boardResistance=10, baseVoltage=3.3):
-        self.pinData = ADC(pinData)
-        self._boardResistance = boardResistance
+    def __init__(self, pinData, pinHeater=-1, boardResistance=10, baseVoltage=3.3, measuringStrategy=STRATEGY_ACCURATE):
+        self._heater = False
+        self._cooler = False
+        self._ro = -1
+
+        self._useSeparateHeater = False
         self._baseVoltage = baseVoltage
 
-        self.stateCalibrate = False
-        self.ro = -1
+        self._lastMesurement = utime.ticks_ms()
         self._rsCache = None
+        self.dataIsReliable = False
+        self.pinData = ADC(pinData)
+        self.measuringStrategy = measuringStrategy
+        self._boardResistance = boardResistance
+        if pinHeater != -1:
+            self.useSeparateHeater = True
+            self.pinHeater = Pin(pinHeater, Pin.OUTPUT)
 
-    def calibrate(self):
-        ro = 0
-        self.stateCalibrate = True
-        print("\n+ Calibrating Gas Sensor:")
-        for i in range(0, self.MQ_SAMPLE_TIMES + 1):
-            print(f"\t -> Step {i}")
-            ro += self.__calculateResistance__(self.pinData.read_u16())
-            utime.sleep_ms(self.MQ_CALIBRATION_INTERVAL)
+    def getRoInCleanAir(self):
+        raise NotImplementedError("Please Implement this method")
 
-        ro = ro / (self.MQ2_RO_BASE * self.MQ_SAMPLE_TIMES)
-        self.ro = ro
-        print(" + Calibration completed")
-        print(f"\t = Base resistance:{self.ro}")
+    def calibrate(self, ro=-1):
+        if ro == -1:
+            ro = 0
+            print("Calibrating:")
+            for i in range(0, self.MQ_SAMPLE_TIMES + 1):
+                print("Step {0}".format(i))
+                ro += self.__calculateResistance__(self.pinData.read_u16())
+                utime.sleep_ms(self.MQ_SAMPLE_INTERVAL)
+                pass
+            ro = ro/(self.getRoInCleanAir() * self.MQ_SAMPLE_TIMES)
+            pass
+        self._ro = ro
+        self._stateCalibrate = True
+
+    def heaterPwrHigh(self):
+        # digitalWrite(_pinHeater, HIGH)
+        # _pinHeater(1)
+        if self._useSeparateHeater:
+            self._pinHeater.on()
+            pass
+        self._heater = True
+        self._prMillis = utime.ticks_ms()
+
+    def heaterPwrLow(self):
+        # analogWrite(_pinHeater, 75)
+        self._heater = True
+        self._cooler = True
+        self._prMillis = utime.ticks_ms()
+
+    def heaterPwrOff(self):
+        if self._useSeparateHeater:
+            self._pinHeater.off()
+            pass
+        _pinHeater(0)
+        self._heater = False
 
     def __calculateResistance__(self, rawAdc):
         vrl = rawAdc*(self._baseVoltage / 65535)
@@ -54,23 +91,87 @@ class MQ2():
         return rsAir
 
     def __readRs__(self):
-        rs = 0
-        for i in range(0, self.MQ_SAMPLE_TIMES + 1):
-            rs += self.__calculateResistance__(self.pinData.read_u16())
-            utime.sleep_ms(self.MQ_SAMPLE_INTERVAL)
+        if self.measuringStrategy == self. STRATEGY_ACCURATE:
+            rs = 0
+            for i in range(0, self.MQ_SAMPLE_TIMES + 1):
+                rs += self.__calculateResistance__(self.pinData.read_u16())
+                utime.sleep_ms(self.MQ_SAMPLE_INTERVAL)
 
-        rs = rs/self.MQ_SAMPLE_TIMES
-        self._rsCache = rs
+            rs = rs/self.MQ_SAMPLE_TIMES
+            self._rsCache = rs
+            self.dataIsReliable = True
+            self._lastMesurement = utime.ticks_ms()
+        else:
+            rs = self.__calculateResistance__(self.pinData.read_u16())
+            self.dataIsReliable = False
         return rs
+
+    def readScaled(self, a, b):
+        return exp((log(self.readRatio())-b)/a)
+
+    def readRatio(self):
+        return self.__readRs__()/self._ro
+
+    def heatingCompleted(self):
+        if (self._heater) and (not self._cooler) and (utime.ticks_diff(utime.ticks_ms(), self._prMillis) > self.MQ_HEATING_PERIOD):
+            return True
+        return False
+
+    def coolanceCompleted(self):
+        if (self._heater) and (self._cooler) and (utime.ticks_diff(utime.ticks_ms(), self._prMillis) > self.MQ_COOLING_PERIOD):
+            return True
+        return False
+
+    def cycleHeat(self):
+        self._heater = False
+        self._cooler = False
+        self.heaterPwrHigh()
+        print("Heated sensor")
+
+    # Use this to automatically bounce heating and cooling states
+    def atHeatCycleEnd(self):
+        if self.heatingCompleted():
+            self.heaterPwrLow()
+            print("Cool sensor")
+            return False
+        if self.coolanceCompleted():
+            self.heaterPwrOff()
+            return True
+        return False
+
+
+class MQ2(BaseMQ):
+    MQ2_RO_BASE = float(9.83)
+
+    def __init__(self, pinData, pinHeater=-1, boardResistance=10, baseVoltage=3.3, measuringStrategy=BaseMQ.STRATEGY_ACCURATE):
+        super().__init__(pinData, pinHeater, boardResistance, baseVoltage, measuringStrategy)
+
+    def readLPG(self):
+        return self.readScaled(-0.45, 2.95)
+
+    def readMethane(self):
+        return self.readScaled(-0.38, 3.21)
+
+    def readSmoke(self):
+        return self.readScaled(-0.42, 3.54)
+
+    def readHydrogen(self):
+        return self.readScaled(-0.48, 3.32)
+
+    def getRoInCleanAir(self):
+        return self.MQ2_RO_BASE
 
 
 # ----------------------------------
 # Recopilacion de datos de Sensores
 # ----------------------------------
 def gas(sensor: MQ2):
-    read = sensor.__readRs__()
-    # print("Gas: " + str(read))
-    return Sensor("Gas", {"valueAnalog": read, "ro": sensor.ro})
+    return Sensor("Gas", {
+        "Smoke": sensor.readSmoke(),
+        "LPG": sensor.readLPG(),
+        "Methane": sensor.readMethane(),
+        "Hydrogen": sensor.readHydrogen()
+    })
 
 
 def humedad(sensor):

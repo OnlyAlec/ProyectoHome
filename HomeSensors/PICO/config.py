@@ -10,7 +10,7 @@ HUMEDAD = ADC(28)
 # COCINA ---------------------------
 BUZZER_COCINA = Pin(6, Pin.OUT)
 LED_COCINA = Pin(7, Pin.OUT)
-GAS = MQ2(27)
+GAS = MQ2(pinData=27, baseVoltage=3.3)
 
 
 # HABITACION ---------------------------
