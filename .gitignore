@@ -2,3 +2,5 @@
 .venv
 .micropico
 Auth
+HomeSensors/RPI/__pycache__/
+HomeSensors/__pycache__/
