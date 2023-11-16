@@ -193,7 +193,7 @@ class dataSensor:
         self.timeRecived = datetime(
             tR[0], tR[1], tR[2], tR[3], tR[4], tR[5]).isoformat()
         # Adicional
-        self.dataServer = None
+        self.dataServer = {}
         self.timeProcess = None
         self.action: list | dict = []
 
@@ -205,6 +205,13 @@ class dataSensor:
         self.timeProcess = tP.strftime("%Y-%m-%dT%H:%M:%S")
 
     def toServer(self):
+        if self.dataServer.get("type") == "notification":
+            dictFormat = {
+                "title": self.dataServer["title"],
+                "message": self.dataServer["message"]
+            }
+            return dictFormat
+
         dictFormat = {
             "sensor": self.type,
             "data": self.dataServer,
@@ -215,21 +222,22 @@ class dataSensor:
 
 
 class senderListener:
-    def __init__(self, conn: Connection, qRecv):
+    def __init__(self, conn: Connection, qAPISend, qAPIRecv):
         self.conn = conn
-        self.queueAPI: queue.Queue = qRecv
+        self.qSend: queue.Queue = qAPISend
+        self.qRecv: queue.Queue = qAPIRecv
         self.dataIn: dict = {}
         self.dataOut: dict = {}
 
     def processEvents(self, mask) -> bool:
         if mask & selectors.EVENT_READ:
-            print("\t▣ Getting data...")
+            print(" ▣ Getting data...")
             self.dataIn = self.conn.read()
             self.processData()
             self.conn.changeMask("w")
             return True
         if mask & selectors.EVENT_WRITE:
-            print("\t▣ Sending data...")
+            print(" ▣ Sending data...")
             self.checkQueue()
             self.conn.write(self.dataOut)
             self.conn.changeMask("r")
@@ -248,37 +256,40 @@ class senderListener:
 
         for d in self.dataIn:
             dataS = dataSensor(d["sensorName"], d["data"], d["time"])
-            fn, server = fnValid[dataS.type](**dataS.dataRecived)
-            if fn is not None:
+            fn, server, dispSend = fnValid[dataS.type](**dataS.dataRecived)
+            if dispSend == "Pico" and fn is not None:
                 dataS.setFn(fn)
             dataS.setServer(server, datetime.now())
-            self.queueAPI.put(dataS.toServer())
+            self.qSend.put(dataS.toServer())
             self.dataOut[dataS.type] = dataS.action
 
     def checkQueue(self):
-        if not self.queueAPI.empty():
+        if not self.qRecv.empty():
             if isinstance(self.dataOut, dict):
-                self.dataOut["API"] = self.queueAPI.get()
+                self.dataOut["API"] = self.qRecv.get()
             elif isinstance(self.dataOut, list):
-                self.dataOut.append(self.queueAPI.get())
-            self.queueAPI.task_done()
+                self.dataOut.append(self.qRecv.get())
+            self.qRecv.task_done()
 
 
 class API:
     def __init__(self, qAPISend, qAPIRecv):
-        self.url = "http://200.10.0.1:80/v1.0/nosql"
+        self.url = "http://200.10.0.1:8080/v1.0/dbnosql"
         self.queueAPI: queue.Queue = qAPISend
         self.queueActions: queue.Queue = qAPIRecv
         self.dataIn: dict = {}
         self.dataOut: dict = {}
 
     # Implementar request para el recibir
-    def listenerWorker(self):
-        while True:
+    def listenerWorker(self, stop):
+        while not stop.is_set():
             try:
                 r = requests.get(self.url)
                 if r.status_code != 200:
-                    raise ValueError("Status Code Not 200")
+                    print("\n\t* No info ready...")
+                    sleep(3)
+                    continue
+                print("\n\t* READY TO DO...")
                 data = r.json()
                 if data is not None:
                     self.queueActions.put(data)
@@ -286,12 +297,12 @@ class API:
             except Exception:
                 print(f"!!! ERROR API LISTENER -> \t"
                       f"{traceback.format_exc()}")
-                sleep(0.5)
+                stop.set()
                 break
 
     # Implementar request para el envio
-    def senderWorker(self):
-        while True:
+    def senderWorker(self, stop):
+        while not stop.is_set():
             if self.queueAPI.empty():
                 sleep(0.5)
                 continue
@@ -299,9 +310,11 @@ class API:
                 dataJson = self.queueAPI.get()
                 self.queueAPI.task_done()
                 dataJson = json.dumps(dataJson)
-                r = requests.post(self.url, data=dataJson)
-                print(r.content)
+                headers = {'Content-Type': 'application/json'}
+                r = requests.post(self.url, headers=headers,
+                                  data=dataJson)
             except Exception:
                 print(f"!!! ERROR API SENDER -> \t"
                       f"{traceback.format_exc()}")
+                stop.set()
                 break

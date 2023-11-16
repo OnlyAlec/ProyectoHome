@@ -10,6 +10,7 @@ import libConnect as libRPI
 if __name__ == '__main__':
     qAPISend = queue.Queue()
     qAPIRecv = queue.Queue()
+    stop = threading.Event()
 
     print("Init program...")
 
@@ -17,19 +18,18 @@ if __name__ == '__main__':
     brRPI = libRPI.API(qAPISend, qAPIRecv)
 
     apiSender = threading.Thread(
-        target=brRPI.senderWorker, args=[], daemon=True)
+        target=brRPI.senderWorker, args=[stop], daemon=True)
     apiListener = threading.Thread(
-        target=brRPI.listenerWorker, args=[], daemon=True)
-
-    apiSender.start()
-    apiListener.start()
+        target=brRPI.listenerWorker, args=[stop], daemon=True)
 
     # *Conexion con la PICO
     connPICO: libRPI.Connection = libRPI.initConnectPico()
-    brPICO = libRPI.senderListener(connPICO, qAPISend)
+    apiSender.start()
+    apiListener.start()
+    brPICO = libRPI.senderListener(connPICO, qAPISend, qAPIRecv)
     sel = connPICO.selector
     try:
-        while True:
+        while not stop.is_set():
             events = sel.select(timeout=None)
             for key, mask in events:
                 try:
@@ -40,7 +40,7 @@ if __name__ == '__main__':
                         f"{traceback.format_exc()}"
                     )
                     connPICO.close()
-                    break
+                    stop.set()
     finally:
         print("Waiting Threads...")
         apiSender.join()
@@ -48,4 +48,5 @@ if __name__ == '__main__':
 
         print("Ending...")
         sel.close()
+        connPICO.close()
         sys.exit()

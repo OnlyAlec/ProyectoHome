@@ -1,46 +1,37 @@
-from math import exp, log
-
 
 def sGas(**kwargs):
-    vAnalog = kwargs["valueAnalog"]
-    ro = kwargs["ro"]
-    # ^LPG, Methane, Smoke, Hydrogen
-    listValues = [(-0.45, 2.95), (-0.38, 3.21), (-0.42, 3.54), (-0.48, 3.32)]
-    results = []
-    for (a, b) in listValues:
-        ratio = vAnalog/ro
-        results.append(exp(log(ratio-b)/a))
-    # print('\t\t◈  Gas:',
-    #       f'LPG: {results[0]},',
-    #       f'Methane: {results[1]},',
-    #       f'Smoke: {results[2]},',
-    #       f'Hydrogen: {results[3]}', sep='\n\t\t\t'
-    #       )
-    action = [
-        {
+    # results = [kwargs["Smoke"], kwargs["LPG"],
+    #            kwargs["Methane"], kwargs["Hydrogen"]]
+    results = kwargs["Methane"]
+    if results > 10000:
+        action = {
             "function": "buzzerAction", "args": {
-                "buzzer": "BUZZER_COCINA", "state": "ON", "time": 0.5
-            }
-        },
-        {
-            "function": "ledChange", "args": {
-                "led": "LED_COCINA", "state": "ON"
+                "buzzer": "BUZZER_COCINA", "state": "ON"
             }
         }
-    ]
-    return action, {"gas": results}
+
+    else:
+        action = {
+            "function": "buzzerAction", "args": {
+                "buzzer": "BUZZER_COCINA", "state": "OFF"
+            }
+        }
+
+    return action, {"gas": results}, "Pico"
 
 
 def sHumedad(**kwargs):
     vAnalog = kwargs["valueAnalog"]
     humedad = (vAnalog / 65535) * 100
     # print(f'\t\t◈  Humedad: {humedad}')
-    action = {
-        "function": "ledChange",
-        "args": {"led": "LED_JARDIN_HUMEDAD", "state": "ON"}
-    }
-    return action, {"humedad": humedad}
-    # *Si no hay mucha humedad animacion de led azules
+    if humedad < 30:
+        notification = {
+            "type": "notification",
+            "title": "¡Recomedacion sobre Jardin!",
+            "message": "Es momento de regar el jardín, la humedad de la tierra esta baja."
+        }
+        return notification, {"humedad": humedad}, "Rpi"
+    return None, {"humedad": humedad}, "Rpi"
 
 
 def sRFID(**kwargs):
@@ -61,33 +52,25 @@ def sLuz(**kwargs):
         action = [
             {
                 "function": "ledChange",
-                "args": {"led": "LED_JARDIN_LUZ", "state": "ON"}
-            },
-            {
-                "function": "ledChange",
                 "args": {"led": "LED_HABITACION", "state": "ON"}
             },
             {
-                "function": "servoAction",
-                "args": {"servo": "SERVO_HABITACION", "state": "ON"}
+                "function": "ledChange",
+                "args": {"led": "LED_JARDIN_LUZ", "state": "ON"}
             }
         ]
     else:
         action = [
             {
                 "function": "ledChange",
-                "args": {"led": "LED_JARDIN", "state": "OFF"}
-            },
-            {
-                "function": "ledChange",
                 "args": {"led": "LED_HABITACION", "state": "OFF"}
             },
             {
-                "function": "servoAction",
-                "args": {"servo": "SERVO_HABITACION", "state": "OFF"}
+                "function": "ledChange",
+                "args": {"led": "LED_JARDIN_LUZ", "state": "OFF"}
             }
         ]
-    return action, {"luz": porcentaje}
+    return action, {"luz": porcentaje}, "Pico"
 
 
 def sIR(**kwargs):
@@ -103,7 +86,7 @@ def sIR(**kwargs):
             "function": "ledChange",
             "args": {"led": "LED_ENTRADA", "state": "OFF"}
         }
-    return action, {"IR": status}
+    return action, {"IR": status}, "Pico"
 
 
 def sTemp(**kwargs):
@@ -111,5 +94,18 @@ def sTemp(**kwargs):
     conversionFactor = 3.3 / (65535)
     v = vAnalog * conversionFactor
     temp = 27 - (v - 0.706)/0.001721
-    # print(f'\t\t◈  Temperatura: {temp}')
-    return None, {"temperatura": temp}
+    if temp > 30:
+        notification = {
+            "type": "notification",
+            "title": "¡Recomedacion de Temperatura!",
+            "message": "Lleva ropa ligera, la temperatura del dia de hoy es alta."
+        }
+        return notification, {"temperatura": temp}, "Rpi"
+    if temp < 15:
+        notification = {
+            "type": "notification",
+            "title": "¡Recomedacion de Temperatura!",
+            "message": "Está haciendo mucho frío, no olvides abrigarte al salir."
+        }
+        return notification, {"temperatura": temp}, "Rpi"
+    return None, {"temperatura": temp}, None
