@@ -4,24 +4,20 @@ import threading
 import traceback
 import libConnect as libRPI
 
-
 # ----------------------------------
 # Main
 # ----------------------------------
 if __name__ == '__main__':
     qAPISend = queue.Queue()
     qAPIRecv = queue.Queue()
-    # stop_event = threading.Event()
 
     print("Init program...")
-    connRPI: libRPI.Connection = libRPI.initConnectRPI(
-        host="200.10.0.1", port=2050)
-    connPICO: libRPI.Connection = libRPI.initConnectPico()
 
     # *Conexion con RPI
-    brRPI = libRPI.API(connRPI, qAPIRecv, qAPISend)
+    brRPI = libRPI.API(qAPISend, qAPIRecv)
+
     apiSender = threading.Thread(
-        target=brRPI.senderWoker, args=[], daemon=True)
+        target=brRPI.senderWorker, args=[], daemon=True)
     apiListener = threading.Thread(
         target=brRPI.listenerWorker, args=[], daemon=True)
 
@@ -29,6 +25,7 @@ if __name__ == '__main__':
     apiListener.start()
 
     # *Conexion con la PICO
+    connPICO: libRPI.Connection = libRPI.initConnectPico()
     brPICO = libRPI.senderListener(connPICO, qAPISend)
     sel = connPICO.selector
     try:

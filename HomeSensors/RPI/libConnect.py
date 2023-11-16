@@ -5,9 +5,10 @@ import queue
 import sys
 import io
 import struct
+from datetime import datetime
 from time import sleep
 import traceback
-from datetime import datetime
+import requests
 
 import libSensors as sensors
 
@@ -26,23 +27,6 @@ def initConnectPico():
     conn.setblocking(True)
     m = Connection(sel, conn, addr)
     sel.register(conn, selectors.EVENT_READ, data=m)
-    return m
-
-
-def initConnectRPI(host, port):
-    print("Connecting to RPI...", end=" ")
-    addr = (host, port)
-    sel = selectors.DefaultSelector()
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect_ex(addr)
-        print(f'\tOK!:  {addr}')
-    except OSError as e:
-        print(f'\tFailed!: {e}')
-        sys.exit()
-
-    m = Connection(sel, s, addr)
-    sel.register(s, selectors.EVENT_WRITE, data=m)
     return m
 
 
@@ -281,42 +265,43 @@ class senderListener:
 
 
 class API:
-    def __init__(self, conn, qAPISend, qAPIRecv):
-        self.conn: Connection = conn
+    def __init__(self, qAPISend, qAPIRecv):
+        self.url = "http://200.10.0.1:80/v1.0/nosql"
         self.queueAPI: queue.Queue = qAPISend
         self.queueActions: queue.Queue = qAPIRecv
         self.dataIn: dict = {}
         self.dataOut: dict = {}
 
-    def senderWoker(self):
+    # Implementar request para el recibir
+    def listenerWorker(self):
+        while True:
+            try:
+                r = requests.get(self.url)
+                if r.status_code != 200:
+                    raise ValueError("Status Code Not 200")
+                data = r.json()
+                if data is not None:
+                    self.queueActions.put(data)
+                sleep(1)
+            except Exception:
+                print(f"!!! ERROR API LISTENER -> \t"
+                      f"{traceback.format_exc()}")
+                sleep(0.5)
+                break
+
+    # Implementar request para el envio
+    def senderWorker(self):
         while True:
             if self.queueAPI.empty():
                 sleep(0.5)
                 continue
-            sensorData = self.queueAPI.get()
             try:
-                self.conn.write(sensorData)
-                print("\t▣ OK!")
+                dataJson = self.queueAPI.get()
                 self.queueAPI.task_done()
+                dataJson = json.dumps(dataJson)
+                r = requests.post(self.url, data=dataJson)
+                print(r.content)
             except Exception:
-                print(f"!!! ERROR SENDER -> \t"
+                print(f"!!! ERROR API SENDER -> \t"
                       f"{traceback.format_exc()}")
-                self.conn.close()
                 break
-
-    def listenerWorker(self):
-        sel = self.conn.selector
-        while True:
-            events = sel.select(timeout=None)
-            for cwd in events:
-                try:
-                    actionAPI = self.conn.read()
-                    self.queueActions.put(actionAPI)
-                    print("\t▣ OK!")
-                except Exception:
-                    print(
-                        f"!!! ERROR LISTENER -> \t"
-                        f"{traceback.format_exc()}"
-                    )
-                    self.conn.close()
-                    break
