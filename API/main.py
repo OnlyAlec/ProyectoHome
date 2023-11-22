@@ -3,9 +3,9 @@ from queue import Queue
 from flask import Flask, request, make_response
 from oracledb import DatabaseError, OperationalError
 from flask_cors import CORS
-
+from firebase_admin import db as firebaseDB
 from libSQL import DB, Operation
-from libNOSQL import NODB, Firebase
+from libNOSQL import ConnectionFirebase, Firebase
 
 q = Queue()
 
@@ -36,6 +36,7 @@ class Request:
 # Init
 app = Flask(__name__)
 CORS(app)
+firebaseApp = ConnectionFirebase(q)
 
 
 @app.route("/v1.0/dbsql", methods=["GET", "POST"])
@@ -60,47 +61,70 @@ def mainSQL():
     return "Que haces aqui? Hablale a Alec!"
 
 
-dbnosql = NODB(q)
-dbnosql.setupListeners()
-
-
 @app.route("/v1.0/dbnosql", methods=["GET", "POST"])
-def mainNoSQL():
+def firebasePushPull():
     app.logger.info('Init request NoSQL!')
-    if not request.is_json and len(request.args) == 0 and request.method == "POST":
-        return "Invalid request", 400
-
     # &Cuando mando datos para la firebase
     if request.method == "POST":
-        db = Firebase(request.json)
-        try:
-            if db.type == "notification":
-                db.insertNotification()
-                return "OK POST!"
+        if not isinstance(request.json, list):
+            listData = [request.json]
+        else:
+            listData = request.json
+
+        for data in listData:
+            db = Firebase(data)
             db.parseJSON()
-            db.insertBucket()
-            db.insertReg()
-            db.insertLastReg()
-            return "OK POST!"
-        except Exception as e:
-            app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
-            return respondServer(("error", e.args[0]), 500)
+            try:
+                if db.type == "notification":
+                    db.insertNotification()
+                else:
+                    db.insertBucket()
+                    db.insertReg()
+                    db.insertLastReg()
+            except Exception as e:
+                app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
+                return respondServer(("error", e.args[0]), 500)
+        return respondServer(("OK", "Data inserted"), 200)
 
     # &Cuando recibo datos del firebase
-    else:
-        try:
-            listAction = []
-            while not q.empty():
-                listAction.append(q.get())
+    try:
+        listAction = []
+        while not q.empty():
+            listAction.append(q.get())
 
-            if len(listAction) == 0:
-                return respondServer(("error", "No data"), 400)
+        if len(listAction) == 0:
+            return respondServer(("error", "No data"), 400)
 
-            jsonList = json.dumps(listAction)
-            return jsonList
-        except Exception as e:
-            app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
-            return respondServer(("error", e.args[0]), 500)
+        jsonList = json.dumps(listAction)
+        return jsonList
+    except Exception as e:
+        app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
+        return respondServer(("error", e.args[0]), 500)
 
     app.logger.critical('Client end up here! Problem with structure!')
     return "Que haces aqui? Hablale a Alec!"
+
+
+@app.route("/v1.0/dbnosql/getState", methods=["GET"])
+def firebaseGetState():
+    actions = []
+    try:
+        for space in firebaseApp.spaces:
+            url = f"{firebaseApp.baseSpaces}/{space}/Dispositivos"
+            data = firebaseDB.reference(url).get()
+            for disp, args in dict(data).items():
+                dispParse, fn = firebaseApp.parseDisp(disp.upper())
+                if dispParse == "null":
+                    continue
+                jsonAction = {
+                    "function": fn,
+                    "args": {
+                        disp: f"{dispParse.upper()}_{space.upper()}",
+                        "state": "ON" if args["estado"] else "OFF"
+                    }
+                }
+                actions.append(jsonAction)
+        return json.dumps(actions)
+    except Exception as e:
+        app.logger.error("%s ->\t %s", str(type(e)), e.args[0])
+        return respondServer(("error", e.args[0]), 500)
