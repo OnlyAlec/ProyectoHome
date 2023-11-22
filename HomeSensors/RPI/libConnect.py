@@ -26,7 +26,7 @@ def initConnectPico():
 
     conn.setblocking(True)
     m = Connection(sel, conn, addr)
-    sel.register(conn, selectors.EVENT_READ, data=m)
+    sel.register(conn, selectors.EVENT_WRITE, data=m)
     return m
 
 
@@ -205,14 +205,25 @@ class dataSensor:
         self.timeProcess = tP.strftime("%Y-%m-%dT%H:%M:%S")
 
     def toServer(self):
-        if self.dataServer.get("type") == "notification":
-            dictFormat = {
-                "title": self.dataServer["title"],
-                "message": self.dataServer["message"]
-            }
-            return dictFormat
+        if len(self.dataServer) > 1:
+            dictFormat = [
+                {
+                    "type": "notification",
+                    "title": self.dataServer['notification']["title"],
+                    "message": self.dataServer['notification']["message"]
+                },
+                {
 
+                    "type": "sensor",
+                    "sensor": self.type,
+                    "data": self.dataServer,
+                    "timeRecived": self.timeRecived,
+                    "timeProcess": self.timeProcess
+                }
+            ]
+            return dictFormat
         dictFormat = {
+            "type": "sensor",
             "sensor": self.type,
             "data": self.dataServer,
             "timeRecived": self.timeRecived,
@@ -228,21 +239,47 @@ class senderListener:
         self.qRecv: queue.Queue = qAPIRecv
         self.dataIn: dict = {}
         self.dataOut: dict = {}
+        self._libSensorsState: dict = {}
 
     def processEvents(self, mask) -> bool:
         if mask & selectors.EVENT_READ:
             print(" ▣ Getting data...")
             self.dataIn = self.conn.read()
             self.processData()
+            self.dataIn = {}
             self.conn.changeMask("w")
             return True
         if mask & selectors.EVENT_WRITE:
             print(" ▣ Sending data...")
             self.checkQueue()
             self.conn.write(self.dataOut)
+            self.dataOut = {}
             self.conn.changeMask("r")
             return True
         return False
+
+    def checkAction(self, action: list | dict):
+        doAction = []
+        if isinstance(action, dict):
+            action = [action]
+
+        for a in action:
+            if "function" not in a.keys():
+                continue
+            a = a["args"].copy()
+            state = a.popitem()[1]
+            sensor = a.popitem()[1]
+
+            if sensor in self._libSensorsState.keys():
+                s = self._libSensorsState[sensor]
+                if s == state:
+                    doAction.append(False)
+                else:
+                    doAction.append(True)
+            self._libSensorsState[sensor] = state
+            doAction.append(True)
+
+        return all(doAction)
 
     def processData(self):
         fnValid = {
@@ -251,17 +288,19 @@ class senderListener:
             "RFUD": sensors.sRFID,
             "Luz": sensors.sLuz,
             "IR": sensors.sIR,
-            "Temperatura": sensors.sTemp
+            "Temperatura": sensors.sTemp,
+            "RFID": sensors.sRFID
         }
 
         for d in self.dataIn:
             dataS = dataSensor(d["sensorName"], d["data"], d["time"])
-            fn, server, dispSend = fnValid[dataS.type](**dataS.dataRecived)
-            if dispSend == "Pico" and fn is not None:
+            fn, server = fnValid[dataS.type](**dataS.dataRecived)
+            if fn is not False and self.checkAction(fn):
                 dataS.setFn(fn)
-            dataS.setServer(server, datetime.now())
-            self.qSend.put(dataS.toServer())
-            self.dataOut[dataS.type] = dataS.action
+                self.dataOut[dataS.type] = dataS.action
+            if server is not False:
+                dataS.setServer(server, datetime.now())
+                self.qSend.put(dataS.toServer())
 
     def checkQueue(self):
         if not self.qRecv.empty():
@@ -274,20 +313,19 @@ class senderListener:
 
 class API:
     def __init__(self, qAPISend, qAPIRecv):
-        self.url = "http://200.10.0.1:8080/v1.0/dbnosql"
+        self.url = "https://apihomeiot.online/v1.0/dbnosql"
+        # self.url = "http://200.10.0.1:8080/v1.0/dbnosql"
         self.queueAPI: queue.Queue = qAPISend
         self.queueActions: queue.Queue = qAPIRecv
         self.dataIn: dict = {}
         self.dataOut: dict = {}
 
-    # Implementar request para el recibir
     def listenerWorker(self, stop):
         while not stop.is_set():
             try:
                 r = requests.get(self.url)
                 if r.status_code != 200:
-                    print("\n\t* No info ready...")
-                    sleep(3)
+                    sleep(1)
                     continue
                 print("\n\t* READY TO DO...")
                 data = r.json()
@@ -300,21 +338,32 @@ class API:
                 stop.set()
                 break
 
-    # Implementar request para el envio
     def senderWorker(self, stop):
         while not stop.is_set():
             if self.queueAPI.empty():
-                sleep(0.5)
                 continue
             try:
                 dataJson = self.queueAPI.get()
-                self.queueAPI.task_done()
                 dataJson = json.dumps(dataJson)
                 headers = {'Content-Type': 'application/json'}
-                r = requests.post(self.url, headers=headers,
-                                  data=dataJson)
+                requests.post(self.url, headers=headers,
+                              data=dataJson)
+                self.queueAPI.task_done()
             except Exception:
                 print(f"!!! ERROR API SENDER -> \t"
                       f"{traceback.format_exc()}")
                 stop.set()
                 break
+
+    def getStateSensor(self):
+        r = requests.get(self.url+"/getState", timeout=120)
+        if r.status_code != 200:
+            print("------------------------------")
+            print("  * API No Availabe, devices as default...")
+            print("------------------------------")
+            return
+        print("--------------------------------")
+        print("  * Getting states of devices...")
+        print("--------------------------------")
+        data = r.json()
+        self.queueActions.put(data)
