@@ -16,16 +16,18 @@ def cooldown(tiempo):
     return decorator
 
 
-class NODB:
+class ConnectionFirebase:
     def __init__(self, q):
+        self.spaces: list = []
         self.connect()
-        self._baseSpaces = "Mi_Casa_Inteligente/Espacios"
-        self._spaces = self.getSpacesName()
+        self.baseSpaces = "Mi_Casa_Inteligente/Espacios"
         self.queueActions: queue.Queue = q
+        self.setupListeners()
 
     def connect(self):
-        cred = credentials.Certificate('./Auth/firebase.json')
+        cred = credentials.Certificate('../Auth/firebase.json')
         initialize_app(cred, {'databaseURL': os.getenv('URL_FIREBASE')})
+        self.spaces = self.getSpacesName()
 
     def getSpacesName(self):
         ref = db.reference('Mi_Casa_Inteligente/Nombre_espacios')
@@ -44,17 +46,17 @@ class NODB:
             return "buzzer", "buzzerAction"
         if disp == "SERVOMOTOR":
             return "servo", "servoAction"
-        return ValueError("Null value!"), ValueError("Null value!")
+        return "null", "null"
 
     def onChange(self, event: db.Event):
         if event.path == "/":
             return
         if event.path.find("Ultimo_modificado") != -1:
             return
-        if (space := event.path.split("/")[1]) not in self._spaces:
+        if (space := event.path.split("/")[1]) not in self.spaces:
             return
         refSpace = dict(db.reference(
-            self._baseSpaces + event.path).get())
+            self.baseSpaces + event.path).get())
         disp, fn = self.parseDisp(refSpace["dispositivo"])
         state = event.data['estado']
         jsonAction = {
@@ -104,7 +106,7 @@ class Firebase:
                microsecond=999999)).strftime("%Y_%m_%d_%H_%M_%S")
         return [actual, timeSensor, start, end]
 
-    @cooldown(5)
+    @cooldown(1)
     def insertNotification(self):
         ref = db.reference(
             f"Mi_Casa_Inteligente/Notificaciones/{self.generateDates()[1]}")
@@ -115,7 +117,7 @@ class Firebase:
             'version': self.version
         })
 
-    @cooldown(5)
+    @cooldown(1)
     def insertBucket(self):
         sensorName = self.sensor.lower()
         ref = db.reference(
