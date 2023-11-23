@@ -1,7 +1,7 @@
 {
   "configurations": [
     {
-      "name": "Python: Flask",
+      "name": "Python: Flask RPI",
       "type": "python",
       "request": "launch",
       "module": "flask",
@@ -16,6 +16,23 @@
         "200.10.0.1",
         "--port",
         "8080"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "cwd": "${fileDirname}"
+    },
+    {
+      "name": "Python: Flask Local",
+      "type": "python",
+      "request": "launch",
+      "module": "flask",
+      "env": {
+        "FLASK_APP": "API/wsgi.py",
+        "FLASK_DEBUG": "1"
+      },
+      "args": [
+        "run",
+        "--no-debugger",
       ],
       "jinja": true,
       "justMyCode": true,

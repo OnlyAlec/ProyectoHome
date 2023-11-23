@@ -13,5 +13,25 @@
         ".vscode/Pico-W-Stub",
         ".vscode\\Pico-W-Stub"
     ],
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "workbench.colorCustomizations": {
+        "activityBar.activeBackground": "#c9f6b4",
+        "activityBar.background": "#c9f6b4",
+        "activityBar.foreground": "#15202b",
+        "activityBar.inactiveForeground": "#15202b99",
+        "activityBarBadge.background": "#7199ee",
+        "activityBarBadge.foreground": "#15202b",
+        "commandCenter.border": "#15202b99",
+        "sash.hoverBorder": "#c9f6b4",
+        "statusBar.background": "#a9f186",
+        "statusBar.foreground": "#15202b",
+        "statusBarItem.hoverBackground": "#88ec58",
+        "statusBarItem.remoteBackground": "#a9f186",
+        "statusBarItem.remoteForeground": "#15202b",
+        "titleBar.activeBackground": "#a9f186",
+        "titleBar.activeForeground": "#15202b",
+        "titleBar.inactiveBackground": "#a9f18699",
+        "titleBar.inactiveForeground": "#15202b99"
+    },
+    "peacock.color": "#a9f186"
 }
