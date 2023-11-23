@@ -12,7 +12,6 @@ BUZZER_COCINA = Pin(6, Pin.OUT)
 LED_COCINA = Pin(7, Pin.OUT)
 GAS = MQ2(pinData=27, baseVoltage=3.3)
 
-
 # HABITACION ---------------------------
 SERVO_HABITACION = Pin(8, Pin.OUT)
 LED_HABITACION = Pin(9, Pin.OUT)
@@ -27,6 +26,4 @@ BUZZER_GARAGE = Pin(12, Pin.OUT)
 IR = Pin(13, Pin.IN)
 BUZZER_ENTRADA = Pin(14, Pin.OUT)
 LED_ENTRADA = Pin(15, Pin.OUT)
-# Checar lib
-RFID = [Pin(16, Pin.IN), Pin(17, Pin.IN), Pin(18, Pin.IN),
-        Pin(19, Pin.IN), Pin(20, Pin.IN), Pin(21, Pin.IN)]
+RFID = MFRC522(spi_id=0, sck=18, cs=17, mosi=19, miso=16, rst=20)

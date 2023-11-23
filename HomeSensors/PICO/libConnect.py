@@ -30,7 +30,7 @@ class Connection:
         self.responseCreated = False
         self.jsonHeader: dict = {}
         self.request: dict = {}
-        self.mask = EVENT_WRITE
+        self.mask = EVENT_READ
         self._lenJSON: int = 0
         self._buffer = b""
         self._sendBuffer = b""
@@ -85,7 +85,12 @@ class Connection:
         return json.dumps(obj).encode("utf-8")
 
     def _decodeJSON(self, bytesJSON):
-        return json.loads(bytesJSON)
+        try:
+            return json.loads(bytesJSON)
+        except Exception as e:
+            print("\n\n!!! ERROR DECODE -> \t\n\n", sys.exc_info()[0])
+            print(f"\t\t-> {bytesJSON}")
+            return {}
 
     def _read(self):
         try:
@@ -150,6 +155,7 @@ class Connection:
         return True
 
     def write(self, data):
+        self._resetParams()
         if not self.responseCreated:
             self.createResponse(data)
         self._write()
@@ -188,3 +194,7 @@ class senderListener:
 
     def setData(self, data):
         self.dataOut = data
+
+    def wipe(self):
+        self.dataIn = {}
+        self.dataOut = []

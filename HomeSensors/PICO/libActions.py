@@ -3,37 +3,50 @@ import config
 
 
 def ledChange(**kwargs):
-    state = kwargs["state"]
-    led = getattr(config, kwargs["led"])
-    print(f"\t\t # LED: {led} -> {state}")
+    try:
+        state = kwargs["state"]
+        led = getattr(config, kwargs["led"])
+        print(f"\t # LED: {kwargs["led"]} -> {state}")
 
-    if state == "ON" and led.value() == 0:
-        led.on()
-        return True
-    if state == "OFF" and led.value() == 1:
-        led.off()
-        return True
-    return False
+        if state == "ON":
+            led.on()
+        else:
+            led.off()
+    except Exception as e:
+        print(f"\t\t !# Error: {e}")
+        return False
+    return True
 
 
 def servoAction(**kwargs):
-    state = kwargs["state"]
-    servo = getattr(config, kwargs["servo"])
-    pwmServo = PWM(servo)
-    pwmServo.freq(50)
+    try:
+        state = kwargs["state"]
+        servo = getattr(config, kwargs["servo"])
+        print(f"\t # Servo: {kwargs["servo"]} -> {state}")
+        pwmServo = PWM(servo)
+        pwmServo.freq(50)
 
-    if state == "ON":
-        pwmServo.duty_u16(8000)
-    else:
-        pwmServo.duty_u16(2000)
+        if state == "ON":
+            pwmServo.duty_u16(8000)
+        else:
+            pwmServo.duty_u16(2000)
+    except Exception as e:
+        print(f"\t\t !# Error: {e}")
+        return False
     return True
 
 
 def buzzerAction(**kwargs):
-    buzzer = getattr(config, kwargs["buzzer"])
-    state = kwargs["state"]
+    try:
+        buzzer = getattr(config, kwargs["buzzer"])
+        state = kwargs["state"]
+        print(f"\t # Buzzer: {kwargs["buzzer"]} -> {state}")
 
-    if state == "ON":
-        buzzer.on()
-    else:
-        buzzer.off()
+        if state == "ON":
+            buzzer.on()
+        else:
+            buzzer.off()
+    except Exception as e:
+        print(f"\t\t !# Error: {e}")
+        return False
+    return True

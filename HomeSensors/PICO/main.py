@@ -96,32 +96,19 @@ def actionWorker(queue: dict):
 
         print("!!! Action Worker: Processing...")
         for sensor, accionPico in dictActions.items():
-            print(f"# Action: {sensor} -> {accionPico}")
-            if isinstance(accionPico, list):
-                for simpleAction in accionPico:
-                    name = simpleAction["function"]
-                    kwargs = simpleAction["args"]
-                    if name in actionsToDo:
-                        try:
-                            statusAction = actionsToDo[name](**kwargs)
-                            print(f"\t\t # Status Action: {statusAction}")
-                        except Exception as err:
-                            print(f"\t\t # Error: {err}")
-                    else:
-                        print(f"\t\t # Function: {name} not found!\n\n name: {
-                              name} -> kwargs: kwargs")
-            else:
-                name = accionPico["function"]
-                kwargs = accionPico["args"]
-                if name in actionsToDo:
-                    try:
-                        statusAction = actionsToDo[name](**kwargs)
-                        print(f"\t\t # Status Action: {statusAction}")
-                    except Exception as err:
-                        print(f"\t\t # Error: {err}")
-                else:
+            if not isinstance(accionPico, list):
+                accionPico = [accionPico]
+
+            for simpleAction in accionPico:
+                name = simpleAction["function"]
+                kwargs = simpleAction["args"]
+                if name not in actionsToDo:
                     print(f"\t\t # Function: {name} not found!\n\n name: {
-                        name} -> kwargs: {kwargs}")
+                          name} -> kwargs: kwargs")
+                    continue
+                statusAction = actionsToDo[name](**kwargs)
+                print(f"\t   -> Success? : {statusAction}")
+        print("!!! Action Complete!")
         queue.pop(index)
         index += 1
 
@@ -136,7 +123,7 @@ def recolectData():
     dataRecolect.append(sensorFn.ir(getattr(config, "IR")).toDict())
     dataRecolect.append(sensorFn.temp(getattr(config, "TEMP")).toDict())
     dataRecolect.append(sensorFn.gas(getattr(config, "GAS")).toDict())
-    # data.append(sensorFn.rfid(getattr(config, "RFID")).toDict())
+    dataRecolect.append(sensorFn.rfid(getattr(config, "RFID")).toDict())
     return dataRecolect
 
 
@@ -154,8 +141,9 @@ if __name__ == '__main__':
     getattr(config, "GAS").calibrate()
 
     try:
-        server = connectServer(host="200.10.0.15", port=8080)
-        # server = connectServer(host="192.168.191.1", port=8080)
+        server = connectServer(host="200.10.0.18", port=8080)
+        # server = connectServer(host="200.10.0.15", port=8080)
+        # server = connectServer(host="192.168.151.1", port=8080)
         initStatusLED(None, 1)
     except (OSError) as e:
         LED_BICOLOR[1].value(0)
@@ -165,6 +153,8 @@ if __name__ == '__main__':
 
     _thread.start_new_thread(actionWorker, (queueActions,))
     conn = libPICO.senderListener(server, queueActions)
+
+    conn.processEvents()
     while True:
         print("Recollect Data...")
         data = recolectData()
@@ -175,4 +165,6 @@ if __name__ == '__main__':
             if status is False:
                 print("Main: Quitting...")
                 sys.exit()
+            conn.wipe()
+            utime.sleep_ms(500)
         countPackage += 1
