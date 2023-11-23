@@ -1,20 +1,36 @@
-from machine import Pin, SPI
+"""Librerias."""
 from os import uname
+from math import exp, log
+from machine import Pin, SPI
 from machine import ADC
 from micropython import const
 import utime
-from math import exp, log
 
 
 # ----------------------------------
 # Clases de sensores
 # ----------------------------------
 class Sensor:
+    """
+    Clase para representar un sensor.
+
+    Attributes:
+        sensorName: Nombre del sensor
+        data: Diccionario con los datos del sensor
+
+    Methods:
+        toDict:
+            Devuelve un diccionario con los datos del sensor
+    """
+
     def __init__(self, sensor, data):
         self.sensorName = sensor
         self.data = dict(data)
 
     def toDict(self):
+        """
+        Devuelve un diccionario con los datos del sensor.
+        """
         return {
             "sensorName": self.sensorName,
             "data": self.data,
@@ -23,6 +39,60 @@ class Sensor:
 
 
 class BaseMQ(object):
+    """
+    Clase base para los sensores MQ.
+
+    Args:
+        pinData: Pin de datos del sensor MQ
+        pinHeater: Pin de calentador del sensor MQ
+        boardResistance: Resistencia de la placa del sensor
+        baseVoltage: Voltaje del Microcontrolador
+        measuringStrategy: Estrategia de medición
+
+    Attributes:
+        _heater: Estado del calentador
+        _cooler: Estado del enfriador
+        _ro: Valor de Ro (Resistencia en aire limpio)
+        _useSeparateHeater: Bandera para indicar el uso de un calentador separado
+        _baseVoltage: Voltaje del Microcontrolador
+        _lastMesurement: Última medición del sensor
+        _rsCache: Cache de la resistencia
+        dataIsReliable: Bandera para indicar que los datos son confiables
+        pinData: Pin de datos del sensor
+        measuringStrategy: Estrategia de medición
+        _boardResistance: Resistencia de la placa
+        _pinHeater: Pin de calentador del sensor
+        _stateCalibrate: Estado de calibración
+
+    Methods:
+        getRoInCleanAir:
+            Devuelve el valor de Ro en aire limpio, funcion abstracta
+        calibrate:
+            Calibra el sensor
+        heaterPwrHigh:
+            Enciende el calentador
+        heaterPwrLow:
+            Baja la potencia del calentador
+        heaterPwrOff:
+            Apaga el calentador
+        __calculateResistance__:
+            Calcula la resistencia
+        __readRs__:
+            Lee la resistencia
+        readScaled:
+            Calculo matemático para escalar la lectura a un valor real
+        readRatio:
+            Calculo de la relación de la resistencia con Ro 
+        heatingCompleted:
+            Comprueba si el calentador se ha calentado
+        coolanceCompleted:
+            Comprueba si el enfriador se ha enfriado
+        cycleHeat:
+            Ciclo de calentamiento
+        atHeatCycleEnd:
+            Comprueba si el ciclo de calentamiento ha terminado
+    """
+    # Constantes de la clase
     MQ_SAMPLE_TIMES = const(5)
     MQ_SAMPLE_INTERVAL = const(100)
     MQ_HEATING_PERIOD = const(60000)
@@ -44,14 +114,27 @@ class BaseMQ(object):
         self.pinData = ADC(pinData)
         self.measuringStrategy = measuringStrategy
         self._boardResistance = boardResistance
+        self._stateCalibrate = False
+
         if pinHeater != -1:
             self.useSeparateHeater = True
-            self.pinHeater = Pin(pinHeater, Pin.OUTPUT)
+            self.pinHeater = Pin(pinHeater, Pin.OUT)
 
     def getRoInCleanAir(self):
+        """
+        Devuelve el valor de Ro en aire limpio, funcion abstracta
+        """
+
         raise NotImplementedError("Please Implement this method")
 
     def calibrate(self, ro=-1):
+        """
+        Calibra el sensor.
+
+        Args:
+            ro: Valor de Ro (Resistencia en aire limpio)
+        """
+
         if ro == -1:
             ro = 0
             print("Calibrating:")
@@ -66,6 +149,10 @@ class BaseMQ(object):
         self._stateCalibrate = True
 
     def heaterPwrHigh(self):
+        """
+        Enciende el calentador.
+        """
+
         # digitalWrite(_pinHeater, HIGH)
         # _pinHeater(1)
         if self._useSeparateHeater:
@@ -75,12 +162,20 @@ class BaseMQ(object):
         self._prMillis = utime.ticks_ms()
 
     def heaterPwrLow(self):
+        """
+        Baja la potencia del calentador.
+        """
+
         # analogWrite(_pinHeater, 75)
         self._heater = True
         self._cooler = True
         self._prMillis = utime.ticks_ms()
 
     def heaterPwrOff(self):
+        """
+        Apaga el calentador.
+        """
+
         if self._useSeparateHeater:
             self._pinHeater.off()
             pass
@@ -88,11 +183,28 @@ class BaseMQ(object):
         self._heater = False
 
     def __calculateResistance__(self, rawAdc):
+        """
+        Calcula la resistencia.
+
+        Args:
+            rawAdc: Valor del ADC
+
+        Returns:
+            float: Resistencia calculada
+        """
+
         vrl = rawAdc*(self._baseVoltage / 65535)
-        rsAir = (self._baseVoltage - vrl)/vrl*self._boardResistance
+        rsAir: float = (self._baseVoltage - vrl)/vrl*self._boardResistance
         return rsAir
 
     def __readRs__(self):
+        """
+        Lee la resistencia por medio de promedio de muestras en intervalos de tiempos especificos.
+
+        Returns:
+            float: Promedio de los valores leidos.
+        """
+
         if self.measuringStrategy == self. STRATEGY_ACCURATE:
             rs = 0
             for i in range(0, self.MQ_SAMPLE_TIMES + 1):
@@ -109,29 +221,75 @@ class BaseMQ(object):
         return rs
 
     def readScaled(self, a, b):
+        """
+        Calculo matemático para escalar la lectura a un valor real.
+
+        Args:
+            a: Valor de la constante especifica para cada tipo de medicion.
+            b: Valor de la constante especifica para cada tipo de medicion.
+
+        Returns:
+            float: Valor escalado
+        """
+
         return exp((log(self.readRatio())-b)/a)
 
     def readRatio(self):
+        """
+        Calculo de la relación de la resistencia con Ro.
+
+        Returns:
+            float: Valor de la relación
+        """
+
         return self.__readRs__()/self._ro
 
     def heatingCompleted(self):
+        """
+        Comprueba si el calentador se ha calentado.
+
+        Returns:
+            bool: True si se ha calentado, False si no
+        """
+
         if (self._heater) and (not self._cooler) and (utime.ticks_diff(utime.ticks_ms(), self._prMillis) > self.MQ_HEATING_PERIOD):
             return True
         return False
 
     def coolanceCompleted(self):
+        """
+        Comprueba si el enfriador se ha enfriado.
+
+        Returns:
+            bool: True si se ha enfriado, False si no
+        """
+
         if (self._heater) and (self._cooler) and (utime.ticks_diff(utime.ticks_ms(), self._prMillis) > self.MQ_COOLING_PERIOD):
             return True
         return False
 
     def cycleHeat(self):
+        """
+        Ciclo de calentamiento.
+
+        Returns:
+            bool: True si se ha calentado, False si no
+        """
+
         self._heater = False
         self._cooler = False
         self.heaterPwrHigh()
         print("Heated sensor")
 
-    # Use this to automatically bounce heating and cooling states
     def atHeatCycleEnd(self):
+        """
+        Comprueba si el ciclo de calentamiento ha terminado.
+        Se utiliza para cambiar el estado de calentamiento y enfriamiento.
+
+        Returns:
+            bool: True si se ha calentado, False si no
+        """
+
         if self.heatingCompleted():
             self.heaterPwrLow()
             print("Cool sensor")
@@ -143,29 +301,161 @@ class BaseMQ(object):
 
 
 class MQ2(BaseMQ):
+    # Constantes de la clase
     MQ2_RO_BASE = float(9.83)
+
+    """
+    Clase para el sensor MQ2 (Sensor de gas).
+
+    Args:
+        pinData: Pin de datos del sensor MQ2
+        pinHeater: Pin de calentador del sensor MQ2
+        boardResistance: Resistencia de la placa del sensor
+        baseVoltage: Voltaje del Microcontrolador
+        measuringStrategy: Estrategia de medición
+
+    Attributes:
+        MQ2_RO_BASE: Valor de Ro (Resistencia en aire limpio)
+    
+    Methods:
+        readLPG:
+            Lee el valor de LPG
+        readMethane:
+            Lee el valor del Metano
+        readSmoke:
+            Lee el valor de la condensación de humo
+        readHydrogen:
+            Lee el valor del Hidrógeno
+        getRoInCleanAir:
+            Devuelve el valor de Ro en aire limpio
+    """
 
     def __init__(self, pinData, pinHeater=-1, boardResistance=10, baseVoltage=3.3, measuringStrategy=BaseMQ.STRATEGY_ACCURATE):
         super().__init__(pinData, pinHeater, boardResistance, baseVoltage, measuringStrategy)
 
     def readLPG(self):
+        """
+        Lee el valor de LPG.
+
+        Returns:
+            float: Valor de LPG
+        """
         return self.readScaled(-0.45, 2.95)
 
     def readMethane(self):
+        """
+        Lee el valor del Metano.
+
+        Returns:
+            float: Valor del Metano.
+        """
         return self.readScaled(-0.38, 3.21)
 
     def readSmoke(self):
+        """
+        Lee el valor de la condensación de humo.
+
+        Returns:
+            float: Valor de la condensación de humo.
+        """
         return self.readScaled(-0.42, 3.54)
 
     def readHydrogen(self):
+        """
+        Lee el valor del Hidrógeno.
+
+        Returns:
+            float: Valor del Hidrógeno.
+        """
         return self.readScaled(-0.48, 3.32)
 
     def getRoInCleanAir(self):
+        """
+        Devuelve el valor de Ro en aire limpio.
+
+        Returns:
+            float: Valor de Ro en aire limpio.
+        """
         return self.MQ2_RO_BASE
 
 
 class MFRC522:
+    """
+    Clase para el sensor MFRC522 (Lector RFID).
 
+    Args:
+        sck: Pin de reloj
+        mosi: Pin de datos de salida
+        miso: Pin de datos de entrada
+        rst: Pin de reset
+        cs: Pin de selección
+        baudrate: Velocidad de transmisión
+        spi_id: ID del SPI
+
+    Attributes:
+        sck: Pin de reloj
+        mosi: Pin de datos de salida
+        miso: Pin de datos de entrada
+        rst: Pin de reset
+        cs: Pin de selección
+        spi: Objeto SPI
+        REQIDL: Constante de solicitud de identificación
+        REQALL: Constante de solicitud de todos
+        AUTHENT1A: Constante de autenticación 1A
+        AUTHENT1B: Constante de autenticación 1B
+        PICC_ANTICOLL1: Constante de anticollisión 1
+        PICC_ANTICOLL2: Constante de anticollisión 2
+        PICC_ANTICOLL3: Constante de anticollisión 3
+
+    Methods:
+        _wreg:
+            Escribe un registro usando SPI.
+        _rreg:
+            Lee un registro usando SPI.
+        _sflags:
+            Establece banderas de un registro.
+        _cflags:
+            Limpia banderas de un registro.
+        _tocard:
+            Envia datos a la tarjeta y recibe datos de la tarjeta.
+        _crc:
+            Calcula el CRC (Verificación de Redundancia Cíclica).
+        init:
+            Inicializa el sensor prendiendo la antenna y reiniciando el sensor.
+        reset:  
+            Reinicia el sensor.
+        antenna_on: 
+            Enciende la antena.
+        request:    
+            Solicita la identificación de la tarjeta (UID - Unique Identifier).
+        anticoll:
+            Anticolisión con la información de la tarjeta.
+        PcdSelect:
+            Selecciona la tarjeta enviando su UID.
+        SelectTag:
+            Selecciona la etiqueta por su UID.
+        tohexstring:
+            Convierte un arreglo de bytes a una cadena de texto.
+        SelectTagSN:
+            Selecciona la etiqueta por su número de serie.
+        auth:
+            Autentica mandando la llave de la tarjeta.
+        authKeys:
+            Autentica usando compuertas lógicas a traves de la llave A o B.
+        stop_crypto1:
+            Detiene la autenticación
+        read:
+            Lee un bloque de la tarjeta.
+        write:
+            Escribe un bloque de la tarjeta.
+        writeSectorBlock:
+            Escribe un bloque de un sector en la tarjeta.
+        readSectorBlock:
+            Lee un bloque de un sector en la tarjeta.
+        MFRC522_DumpClassic1K:
+            Recopila los datos de una tarjeta Mifare Classic 1K.
+    """
+    #  Constantes de la clase
     DEBUG = False
     OK = 0
     NOTAGERR = 1
@@ -191,16 +481,7 @@ class MFRC522:
         self.cs.value(1)
 
         board = uname()[0]
-
-        if board in ('WiPy', 'LoPy', 'FiPy'):
-            self.spi = SPI(0)
-            self.spi.init(SPI.MASTER, baudrate=1000000,
-                          pins=(self.sck, self.mosi, self.miso))
-        elif board in ('esp8266', 'esp32'):
-            self.spi = SPI(baudrate=100000, polarity=0, phase=0,
-                           sck=self.sck, mosi=self.mosi, miso=self.miso)
-            self.spi.init()
-        elif board == 'rp2':
+        if board == 'rp2':
             self.spi = SPI(spi_id, baudrate=baudrate,
                            sck=self.sck, mosi=self.mosi, miso=self.miso)
         else:
@@ -210,28 +491,68 @@ class MFRC522:
         self.init()
 
     def _wreg(self, reg, val):
+        """
+        Escribe un registro usando SPI.
 
+        Args:
+            reg: Registro
+            val: Valor
+        """
         self.cs.value(0)
         self.spi.write(b'%c' % int(0xff & ((reg << 1) & 0x7e)))
         self.spi.write(b'%c' % int(0xff & val))
         self.cs.value(1)
 
     def _rreg(self, reg):
+        """
+        Lee un registro usando SPI.
 
+        Args:
+            reg: Registro
+
+        Returns:
+            int: Valor del registro
+        """
         self.cs.value(0)
         self.spi.write(b'%c' % int(0xff & (((reg << 1) & 0x7e) | 0x80)))
         val = self.spi.read(1)
         self.cs.value(1)
-
         return val[0]
 
     def _sflags(self, reg, mask):
+        """
+        Establece banderas de un registro.
+
+        Args:
+            reg: Registro
+            mask: Máscara
+        """
         self._wreg(reg, self._rreg(reg) | mask)
 
     def _cflags(self, reg, mask):
+        """
+        Limpia banderas de un registro.
+
+        Args:
+            reg: Registro
+            mask: Máscara
+        """
+
         self._wreg(reg, self._rreg(reg) & (~mask))
 
     def _tocard(self, cmd, send):
+        """
+        Envia datos a la tarjeta y recibe datos de la tarjeta.
+
+        Args:
+            cmd: Comando
+            send: Datos a enviar
+
+        Returns:
+            int: Estado
+            list: Datos recibidos
+            int: Bits
+        """
         recv = []
         bits = irq_en = wait_irq = n = 0
         stat = self.ERR
@@ -289,6 +610,15 @@ class MFRC522:
         return stat, recv, bits
 
     def _crc(self, data):
+        """	
+        Calcula el CRC (Verificación de Redundancia Cíclica).
+
+        Args:
+            data: Datos
+
+        Returns:
+            list: Datos con el CRC
+        """
 
         self._cflags(0x05, 0x04)
         self._sflags(0x0A, 0x80)
@@ -308,6 +638,10 @@ class MFRC522:
         return [self._rreg(0x22), self._rreg(0x21)]
 
     def init(self):
+        """
+        Inicializa el sensor prendiendo la antenna y reiniciando el sensor.
+        """
+
         print("Init Sensor MFRC522")
         self.reset()
         self._wreg(0x2A, 0x8D)
@@ -319,9 +653,20 @@ class MFRC522:
         self.antenna_on()
 
     def reset(self):
+        """
+        Reinicia el sensor.
+        """
+
         self._wreg(0x01, 0x0F)
 
     def antenna_on(self, on=True):
+        """
+        Enciende la antena.
+
+        Args:
+            on: Estado de la antena
+        """
+
         print("Antena ON...")
         if on and ~(self._rreg(0x14) & 0x03):
             self._sflags(0x14, 0x03)
@@ -329,15 +674,34 @@ class MFRC522:
             self._cflags(0x14, 0x03)
 
     def request(self, mode):
+        """
+        Solicita la identificación de la tarjeta (UID - Unique Identifier).
+
+        Args:
+            mode: Modo de solicitud
+
+        Returns:
+            int: Estado
+            int: Bits
+        """
         self._wreg(0x0D, 0x07)
         (stat, recv, bits) = self._tocard(0x0C, [mode])
 
         if (stat != self.OK) | (bits != 0x10):
             stat = self.ERR
-
         return stat, bits
 
     def anticoll(self, anticolN):
+        """
+        Anticolisión con la información de la tarjeta.
+
+        Args:
+            anticolN: Anticolisión
+
+        Returns:
+            int: Estado
+            list: Datos recibidos
+        """
 
         ser_chk = 0
         ser = [anticolN, 0x20]
@@ -353,10 +717,20 @@ class MFRC522:
                     stat = self.ERR
             else:
                 stat = self.ERR
-
         return stat, recv
 
     def PcdSelect(self, serNum, anticolN):
+        """
+        Selecciona la tarjeta enviando su UID.
+
+        Args:
+            serNum: Número de serie
+            anticolN: Anticolisión
+
+        Returns:
+            int: Estado
+        """
+
         backData = []
         buf = []
         buf.append(anticolN)
@@ -378,6 +752,17 @@ class MFRC522:
             return 0
 
     def SelectTag(self, uid):
+        """
+        Selecciona la etiqueta por su UID.
+
+        Args:
+            uid: UID
+
+        Returns:
+            int: Estado
+            list: UID
+        """
+
         byte5 = 0
 
         # (status,puid)= self.anticoll(self.PICC_ANTICOLL1)
@@ -391,6 +776,16 @@ class MFRC522:
         return (self.OK, uid)
 
     def tohexstring(self, v):
+        """
+        Convierte un arreglo de bytes a una cadena de texto.
+
+        Args:
+            v: Arreglo de bytes
+
+        Returns:
+            str: Cadena de texto
+        """
+
         s = "["
         for i in v:
             if i != v[0]:
@@ -400,6 +795,13 @@ class MFRC522:
         return s
 
     def SelectTagSN(self):
+        """
+        Selecciona la etiqueta por su número de serie.
+
+        Returns:
+            tuple[Literal, list]: Estado, UID
+        """
+
         valid_uid = []
         (status, uid) = self.anticoll(self.PICC_ANTICOLL1)
         # print("Select Tag 1:",self.tohexstring(uid))
@@ -451,9 +853,34 @@ class MFRC522:
         # return (self.OK , valid_uid)
 
     def auth(self, mode, addr, sect, ser):
+        """
+        Autentica mandando la llave de la tarjeta.
+
+        Args:
+            mode: Modo de autenticación
+            addr: Dirección
+            sect: Sector
+            ser: Serie
+
+        Returns:
+            tuple[Literal, list, int]: Estado, Datos recibidos, Bits
+        """
         return self._tocard(0x0E, [mode, addr] + sect + ser[:4])[0]
 
     def authKeys(self, uid, addr, keyA=None, keyB=None):
+        """
+        Autentica usando compuertas lógicas a traves de la llave A o B.
+
+        Args:
+            uid: UID
+            addr: Dirección de memoria
+            keyA: Llave A
+            keyB: Llave B
+
+        Returns:
+            int: Estado
+        """
+
         status = self.ERR
         if keyA is not None:
             status = self.auth(self.AUTHENT1A, addr, keyA, uid)
@@ -462,9 +889,22 @@ class MFRC522:
         return status
 
     def stop_crypto1(self):
+        """
+        Detiene la autenticación.
+        """
+
         self._cflags(0x08, 0x08)
 
     def read(self, addr):
+        """
+        Lee un bloque de la tarjeta.
+
+        Args:
+            addr: Dirección de memoria
+
+        Returns:
+            tuple[Literal, list]: Estado, Datos recibidos
+        """
 
         data = [0x30, addr]
         data += self._crc(data)
@@ -472,6 +912,16 @@ class MFRC522:
         return stat, recv
 
     def write(self, addr, data):
+        """
+        Escribe un bloque de la tarjeta.
+
+        Args:
+            addr: Dirección de memoria
+            data: Datos
+
+        Returns:
+            int: Estado
+        """
 
         buf = [0xA0, addr]
         buf += self._crc(buf)
@@ -490,6 +940,21 @@ class MFRC522:
         return stat
 
     def writeSectorBlock(self, uid, sector, block, data, keyA=None, keyB=None):
+        """
+        Escribe un bloque de un sector en la tarjeta.
+
+        Args:
+            uid: UID
+            sector: Sector del bloque
+            block: Bloque de memoria
+            data: Datos
+            keyA: Llave A
+            keyB: Llave B
+
+        Returns:
+            int: Estado
+        """
+
         absoluteBlock = sector * 4 + (block % 4)
         if absoluteBlock > 63:
             return self.ERR
@@ -500,6 +965,19 @@ class MFRC522:
         return self.ERR
 
     def readSectorBlock(self, uid, sector, block, keyA=None, keyB=None):
+        """
+        Lee un bloque de un sector en la tarjeta.
+
+        Args:
+            uid: UID
+            sector: Sector del bloque
+            block: Bloque de memoria
+            keyA: Llave A
+            keyB: Llave B
+
+        Returns:
+            tuple[Literal, list]: Estado, Datos recibidos
+        """
         absoluteBlock = sector * 4 + (block % 4)
         if absoluteBlock > 63:
             return self.ERR, None
@@ -508,6 +986,19 @@ class MFRC522:
         return self.ERR, None
 
     def MFRC522_DumpClassic1K(self, uid, Start=0, End=64, keyA=None, keyB=None):
+        """
+        Recopila los datos de una tarjeta Mifare Classic 1K.
+
+        Args:
+            uid: UID
+            Start: Bloque inicial
+            End: Bloque final
+            keyA: Llave A
+            keyB: Llave B
+
+        Returns:
+            int: Estado
+        """
         status = None
         for absoluteBlock in range(Start, End):
             status = self.authKeys(uid, absoluteBlock, keyA, keyB)
@@ -538,7 +1029,17 @@ class MFRC522:
 # ----------------------------------
 # Recopilacion de datos de Sensores
 # ----------------------------------
-def gas(sensor: MQ2):
+def gas(sensor: MQ2) -> Sensor:
+    """
+    Recopila los datos del sensor MQ2 (Sensor de gas).
+
+    Args:
+        sensor: Clase del sensor MQ2.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos analogicos leidos.
+    """
+
     return Sensor("Gas", {
         # "Smoke": sensor.readSmoke(),
         # "LPG": sensor.readLPG(),
@@ -547,12 +1048,32 @@ def gas(sensor: MQ2):
     })
 
 
-def humedad(sensor):
+def humedad(sensor) -> Sensor:
+    """
+    Recopila los datos del sensor de humedad.
+
+    Args:
+        sensor: Objeto del sensor de humedad.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos analogicos leidos.
+    """
+
     # print("Humedad: " + str(HUMEDAD.read_u16()))
     return Sensor("Humedad", {"valueAnalog": sensor.read_u16()})
 
 
-def rfid(sensor):
+def rfid(sensor: MFRC522) -> Sensor:
+    """
+    Recopila los datos del sensor RFID.
+
+    Args:
+        sensor: Clase del sensor MFRC522.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos leidos.
+    """
+
     (stat, tag_type) = sensor.request(sensor.REQIDL)
     if stat == sensor.OK:
         (stat, uid) = sensor.SelectTagSN()
@@ -562,18 +1083,48 @@ def rfid(sensor):
     return Sensor("RFID", {"card": "null"})
 
 
-def luz(sensor):
+def luz(sensor) -> Sensor:
+    """
+    Recopila los datos del sensor de luz.
+
+    Args:
+        sensor: Objeto del sensor de luz.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos analogicos leidos.
+    """
+
     # print("Luz: " + sensor.read_u16())
     return Sensor("Luz", {"valueAnalog": sensor.read_u16()})
 
 
-def ir(sensor):
+def ir(sensor) -> Sensor:
+    """
+    Recopila los datos del sensor IR.
+
+    Args:
+        sensor: Objeto del sensor IR.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos leidos.
+    """
+
     irValue: str = "False" if sensor.value() == 1 else "True"
     # print("IR: " + irValue)
     return Sensor("IR", {"status": irValue})
 
 
-def temp(sensor):
+def temp(sensor) -> Sensor:
+    """
+    Recopila los datos del sensor de temperatura.
+
+    Args:
+        sensor: Objeto del sensor de temperatura.
+
+    Returns:
+        Sensor: Objeto del sensor con los datos analogicos leidos.
+    """
+
     valueAnalog = sensor.read_u16()
     # print("Temperatura: " + str(valueAnalog))
     return Sensor("Temperatura", {"valueAnalog": valueAnalog})

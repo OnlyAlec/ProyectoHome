@@ -1,6 +1,8 @@
+"""Librerias."""
 from machine import Pin, PWM, ADC
-from libSensors import MQ2
+from libSensors import MQ2, MFRC522
 
+"""Variables globales."""
 # JARDIN ---------------------------
 LED_JARDIN = Pin(2, Pin.OUT)
 LED_JARDIN_LUZ = Pin(4, Pin.OUT)

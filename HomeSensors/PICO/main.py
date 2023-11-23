@@ -1,17 +1,18 @@
+"""Librerias."""
 import sys
 import _thread
-
 from machine import Pin, PWM
 import utime
 import network
 from micropython import const
 
+# Librerias Propias -----------------
 import libConnect as libPICO
 import libSensors as sensorFn
 import libActions as action
 import config
 
-# OTROS ---------------------------
+# Constantes ---------------------------
 LED_BICOLOR = (Pin(0, Pin.OUT), Pin(1, Pin.OUT))
 EVENT_READ = const(0)
 EVENT_WRITE = const(1)
@@ -21,6 +22,17 @@ EVENT_WRITE = const(1)
 # Funciones conectividad
 # ----------------------------------
 def connectServer(host, port):
+    """
+    Funcion para conectarse al RPI.
+
+    Args:
+        host (str): IP del RPI.
+        port (int): Puerto del RPI.
+
+    Returns:
+        socket: Socket de conexion.
+    """
+
     print("Connecting...", end=" ")
 
     wlan = network.WLAN(network.STA_IF)
@@ -40,6 +52,17 @@ def connectServer(host, port):
 
 
 def initStatusLED(wlan, mode: int = 0):
+    """
+    Funcion para inicializar la conexion a la red junto con una animacion de LED.
+
+    Args:
+        wlan (network.WLAN): Conexion a la red.
+        mode (int, optional): Modo de animacion. Defaults to 0.
+
+    Raises:
+        OSError: Error en la conexion / timeout en la conexion.
+    """
+
     timeoutConnect = 0
     pwmLed = PWM(LED_BICOLOR[mode], freq=50)
     if mode == 0:
@@ -78,6 +101,17 @@ def initStatusLED(wlan, mode: int = 0):
 # Thread acciones
 # ----------------------------------
 def actionWorker(queue: dict):
+    """
+    Funcion para ejecutar las acciones de los sensores que reciba por medio
+    de la cola compartida.
+
+    Args:
+        queue (dict): Cola compartida.
+
+    Raises:
+        IndexError: Error al acceder a la cola.
+    """
+
     index = 0
     actionsToDo = {
         "ledChange": action.ledChange,
@@ -117,6 +151,13 @@ def actionWorker(queue: dict):
 # Funciones para datos
 # ----------------------------------
 def recolectData():
+    """
+    Funcion para recolectar los datos de los sensores.
+
+    Returns:
+        list: Lista de diccionarios con los datos de los sensores.
+    """
+
     dataRecolect = []
     dataRecolect.append(sensorFn.luz(getattr(config, "LUZ")).toDict())
     dataRecolect.append(sensorFn.humedad(getattr(config, "HUMEDAD")).toDict())
