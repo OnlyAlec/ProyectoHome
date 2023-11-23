@@ -31,6 +31,7 @@ if __name__ == '__main__':
     # !Main Loop
     try:
         while not stop.is_set():
+            print("Main: Waiting Events...")
             events = sel.select(timeout=None)
             for key, mask in events:
                 try:

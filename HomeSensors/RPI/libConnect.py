@@ -17,6 +17,8 @@ def initConnectPico():
     print('Listening for PICO...', end=" ")
     sel = selectors.DefaultSelector()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # ?Para evitar error de puerto en uso
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("0.0.0.0", 8080))
     s.listen()
 
