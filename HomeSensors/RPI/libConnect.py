@@ -188,52 +188,6 @@ class Connection:
         self.selector.modify(self.sock, events, data=self)
 
 
-class dataSensor:
-    def __init__(self, typeSensor: str, data: dict, tR: list):
-        self.type = typeSensor
-        self.dataRecived = data
-        self.timeRecived = datetime(
-            tR[0], tR[1], tR[2], tR[3], tR[4], tR[5]).isoformat()
-        # Adicional
-        self.dataServer = {}
-        self.timeProcess = None
-        self.action: list | dict = []
-
-    def setFn(self, listActions: dict | list):
-        self.action = listActions
-
-    def setServer(self, data: dict, tP: datetime):
-        self.dataServer = data
-        self.timeProcess = tP.strftime("%Y-%m-%dT%H:%M:%S")
-
-    def toServer(self):
-        if len(self.dataServer) > 1:
-            dictFormat = [
-                {
-                    "type": "notification",
-                    "title": self.dataServer['notification']["title"],
-                    "message": self.dataServer['notification']["message"]
-                },
-                {
-
-                    "type": "sensor",
-                    "sensor": self.type,
-                    "data": self.dataServer,
-                    "timeRecived": self.timeRecived,
-                    "timeProcess": self.timeProcess
-                }
-            ]
-            return dictFormat
-        dictFormat = {
-            "type": "sensor",
-            "sensor": self.type,
-            "data": self.dataServer,
-            "timeRecived": self.timeRecived,
-            "timeProcess": self.timeProcess
-        }
-        return dictFormat
-
-
 class senderListener:
     def __init__(self, conn: Connection, qAPISend, qAPIRecv):
         self.conn = conn
@@ -295,7 +249,7 @@ class senderListener:
         }
 
         for d in self.dataIn:
-            dataS = dataSensor(d["sensorName"], d["data"], d["time"])
+            dataS = sensors.dataSensor(d["sensorName"], d["data"], d["time"])
             fn, server = fnValid[dataS.type](**dataS.dataRecived)
             if fn is not False and self.checkAction(fn):
                 dataS.setFn(fn)
@@ -315,8 +269,8 @@ class senderListener:
 
 class API:
     def __init__(self, qAPISend, qAPIRecv):
-        self.url = "https://apihomeiot.online/v1.0/dbnosql"
-        # self.url = "http://200.10.0.1:8080/v1.0/dbnosql"
+        # self.url = "https://apihomeiot.online/v1.0/dbnosql"
+        self.url = "http://200.10.0.1:80/v1.0/dbnosql"
         self.queueAPI: queue.Queue = qAPISend
         self.queueActions: queue.Queue = qAPIRecv
         self.dataIn: dict = {}

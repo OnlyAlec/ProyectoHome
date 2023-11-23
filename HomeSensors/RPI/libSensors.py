@@ -1,3 +1,51 @@
+from datetime import datetime
+
+
+class dataSensor:
+    def __init__(self, typeSensor: str, data: dict, tR: list):
+        self.type = typeSensor
+        self.dataRecived = data
+        self.timeRecived = datetime(
+            tR[0], tR[1], tR[2], tR[3], tR[4], tR[5]).isoformat()
+        # Adicional
+        self.dataServer = {}
+        self.timeProcess = None
+        self.action: list | dict = []
+
+    def setFn(self, listActions: dict | list):
+        self.action = listActions
+
+    def setServer(self, data: dict, tP: datetime):
+        self.dataServer = data
+        self.timeProcess = tP.strftime("%Y-%m-%dT%H:%M:%S")
+
+    def toServer(self):
+        if len(self.dataServer) > 1:
+            dictFormat = [
+                {
+                    "type": "notification",
+                    "title": self.dataServer['notification']["title"],
+                    "message": self.dataServer['notification']["message"]
+                },
+                {
+
+                    "type": "sensor",
+                    "sensor": self.type,
+                    "data": self.dataServer,
+                    "timeRecived": self.timeRecived,
+                    "timeProcess": self.timeProcess
+                }
+            ]
+            return dictFormat
+        dictFormat = {
+            "type": "sensor",
+            "sensor": self.type,
+            "data": self.dataServer,
+            "timeRecived": self.timeRecived,
+            "timeProcess": self.timeProcess
+        }
+        return dictFormat
+
 
 def sGas(**kwargs):
     # results = [kwargs["Smoke"], kwargs["LPG"],
