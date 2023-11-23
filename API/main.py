@@ -1,3 +1,4 @@
+"""Librerias."""
 import json
 from queue import Queue
 from flask import Flask, request, make_response
@@ -11,6 +12,16 @@ q = Queue()
 
 
 def respondServer(text, code: int):
+    """
+    Funcion que responde al cliente con un json.
+
+    Args:
+        text (tuple): Texto a responder.
+        code (int): Codigo HTTP de respuesta.
+
+    Returns:
+        Response: Respuesta al cliente.
+    """
     resp = make_response({text[0]: text[1]}, code)
     resp.headers["Content-Type"] = "application/json"
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -18,12 +29,35 @@ def respondServer(text, code: int):
 
 
 class Request:
+    """
+    Clase que maneja las peticiones.
+
+    Args:
+        dRequest (dict): Diccionario que contiene los datos de la peticion.
+
+    Attributes:
+        crud (str): CRUD de la peticion.
+        data (dict): Datos de la peticion.
+
+    Methods:
+        validateRequestSQL: Valida la peticion dirigida a SQL.
+    """
+
     def __init__(self, dRequest):
         self.crud = dRequest.get("crud")
         self.data = dRequest.get("data")
 
-    def validateRequestSQL(self, method=None):
-        if method == None:
+    def validateRequestSQL(self, method=None) -> str | bool:
+        """
+        Valida la peticion dirigida a SQL.
+
+        Args:
+            method (str, optional): Metodo de la peticion. Defaults to None.
+
+        Returns:
+            str | bool: Mensaje de error.
+        """
+        if method is None:
             return "Method not found"
         if method == "POST" and self.crud not in ["INSERT", "DELETE", "UPDATE"]:
             return "Invalid CRUD"
@@ -31,9 +65,10 @@ class Request:
             return "Invalid CRUD"
         if not self.data:
             return "Not Data"
+        return True
 
 
-# Init
+# Init Flask app
 app = Flask(__name__)
 CORS(app)
 firebaseApp = ConnectionFirebase(q)
@@ -41,6 +76,13 @@ firebaseApp = ConnectionFirebase(q)
 
 @app.route("/v1.0/dbsql", methods=["GET", "POST"])
 def mainSQL():
+    """
+    Funcion principal para peticiones a la base de datos SQL.
+    Valida la peticion y crea una instancia de la clase Operation para posterior mandarla a la base de datos.
+
+    Returns:
+        Response: Respuesta al cliente.
+    """
     app.logger.info('Init request SQL!')
     req = Request(request.json if request.is_json else request.args)
     if miss := req.validateRequestSQL(request.method):
@@ -63,6 +105,13 @@ def mainSQL():
 
 @app.route("/v1.0/dbnosql", methods=["GET", "POST"])
 def firebasePushPull():
+    """
+    Funcion para obtener y actualizar datos en la plataforma Firebase.
+    Actualiza o inserta datos en el bucket, registros, ultimo registro y notificaciones.
+
+    Returns:
+        Response: Respuesta al cliente.
+    """
     app.logger.info('Init request NoSQL!')
     # &Cuando mando datos para la firebase
     if request.method == "POST":
@@ -107,6 +156,12 @@ def firebasePushPull():
 
 @app.route("/v1.0/dbnosql/getState", methods=["GET"])
 def firebaseGetState():
+    """
+    Funcion para obtener el estado de los dispositivos en la plataforma Firebase.
+
+    Returns:
+        Response: Respuesta al cliente.
+    """
     actions = []
     try:
         for space in firebaseApp.spaces:

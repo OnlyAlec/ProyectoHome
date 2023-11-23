@@ -1,13 +1,42 @@
+"""Librerias."""
 import os
-
 import json
 import oracledb
 from dotenv import load_dotenv
-
 load_dotenv()
 
 
 class Table:
+    """
+    Clase utilizada para construir consultas SQL a partir de datos en formato JSON o una cadena de texto.
+
+    Args:
+        jsonData (dict | str): Un diccionario JSON o una cadena de texto.
+        table (str, optional): Nombre de la tabla. Defaults to "".
+        query (str, optional): Consulta SQL. Defaults to "".
+
+    Attributes:
+        table (str | list): Nombre de la tabla o lista de nombres de tablas.
+        alias (list): Lista de alias de las tablas.
+        columns (list): Lista de nombres de columnas.
+        values (list): Lista de valores.
+        where (str): Condición WHERE de la consulta SQL.
+        query (str): Consulta SQL.
+
+    Methods:
+        __init__(self, jsonData: dict | str, table: str = "", query: str = ""):
+            Constructor de la clase. Recibe un diccionario JSON o una cadena de texto como entrada y construye la consulta SQL correspondiente.
+
+        construct(self, jsonData: dict):
+            Método interno utilizado por el constructor para construir la consulta SQL a partir del diccionario JSON.
+
+        toUpper(self):
+            Convierte los nombres de las tablas y columnas a mayúsculas.
+
+        strValues(self):
+            Retorna la representación en cadena de los valores.
+    """
+
     def __init__(self, jsonData: dict | str, table: str = "", query: str = ""):
         self.table: str | list = table
         self.alias: list = []
@@ -22,6 +51,12 @@ class Table:
                 self.construct(jsonData)
 
     def construct(self, jsonData: dict):
+        """
+        Método interno utilizado por el constructor para construir la consulta SQL a partir del diccionario JSON.
+
+        Args:
+            jsonData (dict): Un diccionario JSON.
+        """
         for column, value in jsonData.items():
             if column == "alias":
                 self.alias = value
@@ -30,7 +65,6 @@ class Table:
                 cond: str = value.split("=")[1].strip()
                 self.where = f"{campo}='{cond}'"
             elif column == "query":
-                # !Puede que solo me manden el query ya hecho pero no sabemos
                 table = Table(self.table, value)
             else:
                 if column == "null":
@@ -38,43 +72,46 @@ class Table:
                 else:
                     self.columns.append(column)
                 self.values.append(value)
-            # &Es es por si mandan la estructura de la tabla en un JSON y no el query
-            # if key == "Tables":
-            #     for table, alias in value.items():
-            #         self.table.append(table)
-            #         self.alias.append(alias)
-            # elif key == "Columns":
-            #     elif isinstance(value, dict):
-            #         for table, columns in value.items():
-            #             self.columns.append({table: columns})
-            # elif key == "Values":
-            #     for values in value:
-            #         self.values.append(values)
-            # else:
-            #     raise ValueError("Key not found!")
 
     def toUpper(self):
+        """
+        Convierte los nombres de las tablas y columnas a mayúsculas.
+        """
         self.table = [table.upper() for table in self.table] if isinstance(
             self.table, list) else self.table.upper()
         self.columns = [column.upper() for column in self.columns] if isinstance(
             self.columns, list) else self.columns.upper()
 
-    def strTable(self):
-        query = ""
-        if len(self.table) == len(self.alias):
-            for table, alias, asTable in self.table, self.alias:
-                query += f"{table}"
-                if alias != "":
-                    query += f" {alias}"
-                if asTable != "":
-                    query += f" AS {asTable}"
-                query += ", "
+    def strValues(self) -> str:
+        """
+        Retorna la representación en cadena de los valores.
 
-    def strValues(self):
+        Returns:
+            str: Representación en cadena de los valores.
+        """
         return ", ".join(self.values)
 
 
 class DB:
+    """
+    Clase para interactuar con una base de datos Oracle.
+
+    Attributes:
+        allTables (list): Lista de tablas de la base de datos.
+        connection (oracledb.Connection): Conexión con la base de datos.
+        cursor (oracledb.Cursor): Cursor de la conexión.
+
+    Methods:
+        __init__():
+            Constructor de la clase que establece una conexión con la base de datos y obtiene todas las tablas.
+        connect():
+            Establece una conexión con la base de datos.
+        getAllTables():
+            Obtiene todas las tablas de la base de datos.
+        existColumn(table, column):
+            Verifica si una columna existe en una tabla específica.
+    """
+
     def __init__(self):
         self.allTables = []
         self.connection: oracledb.Connection = None
@@ -86,12 +123,18 @@ class DB:
         except Exception as e:
             raise e
 
-    def connect(self):
+    def connect(self) -> bool | Exception:
+        """
+        Establece una conexión con la base de datos utilizando las credenciales proporcionadas en variables de entorno.
+
+        Returns:
+            bool | Exception : `True` si la conexión es exitosa de lo contrario lanza una excepción.
+        """
         if self.connection is not None:
-            print("\t -> Already Connect!")
+            print("\t -> ¡Ya está conectado!")
             return False
 
-        print("Connecting to SQL...", end=" ")
+        print("Conectando a SQL...", end=" ")
         ip = os.getenv("DB_IP")
         pwd = os.getenv("DB_PASSWORD")
         userDB = os.getenv("DB_USER")
@@ -101,14 +144,18 @@ class DB:
                 user=str(userDB),
                 password=str(pwd),
                 dsn=f"{ip}/xepdb1")
-            print("OK!")
+            print("¡Conexión exitosa!")
             self.cursor = self.connection.cursor()
             return True
         except (oracledb.DatabaseError, oracledb.OperationalError) as e:
-            print(f"Failed! -> \t {e}")
+            print(f"¡Falló la conexión! -> \t {e}")
             raise e
 
     def getAllTables(self):
+        """
+        Ejecuta consultas SQL para obtener todas las tablas y vistas de la base de datos.
+        Almacena los resultados en la variable `allTables`.
+        """
         self.cursor.execute(
             "SELECT TABLE_NAME FROM all_tables WHERE OWNER = 'SOFIDBA_02'")
         self.allTables = [
@@ -119,7 +166,17 @@ class DB:
         for table in self.cursor.fetchall():
             self.allTables.append(table[0])
 
-    def existColumn(self, table: str, column: str):
+    def existColumn(self, table: str, column: str) -> bool:
+        """
+        Verifica si una columna existe en una tabla específica.
+
+        Args:
+            table (str): Nombre de la tabla.
+            column (str): Nombre de la columna.
+
+        Returns:
+            bool: Resultado de la verificación.
+        """
         try:
             self.cursor.execute(
                 f"SELECT {column} FROM {table} WHERE 1=2")
@@ -129,6 +186,47 @@ class DB:
 
 
 class Operation:
+    """
+    Clase responsable de ejecutar las operaciones CRUD en la base de datos.
+
+    Args:
+        `dbDest` (DB): Base de datos de destino.
+        `crud` (str): Tipo de operación CRUD.
+        `data` (dict): Datos a utilizar en la operación.
+
+    Attributes:
+        db (DB): Base de datos de destino.
+        crud (str): Tipo de operación CRUD.
+        data (dict): Datos a utilizar en la operación.
+        tablesWaiting (list): Lista de tablas a utilizar en la operación.
+        tablesObj (list): Lista de objetos `Table` a utilizar en la operación.
+        response (list | dict): Respuesta de la operación.
+
+    Methods:
+        __init__(self, dbDest: DB, crud: str, data: dict):
+            Constructor de la clase. Recibe una base de datos, el tipo de operación CRUD y los datos a utilizar en la operación.
+        checkObligatory(self):
+            Verifica que los datos obligatorios estén presentes en los datos proporcionados.
+        parseJSON(self, data):
+            Convierte los datos en formato JSON a un diccionario.
+        getTables(self):
+            Obtiene las tablas de la base de datos a partir de los datos proporcionados.
+        orderTables(self, table: str):
+            Ordena las tablas de acuerdo a las dependencias entre ellas.
+        execute(self):
+            Ejecuta la operación CRUD.
+        checkValidation(self, tableClass: Table):
+            Verifica que las tablas y columnas proporcionadas existan en la base de datos.
+        getIDChild(self, nameColumn: str):
+            Obtiene el ID de la tabla hija.
+        insert(self, table: Table):
+            Ejecuta la operación INSERT.
+        update(self, table: Table):
+            Ejecuta la operación UPDATE.
+        delete(self, table: Table):
+            Ejecuta la operación DELETE.
+    """
+
     def __init__(self, dbDest: DB, crud: str, data: dict):
         self.db = dbDest
         self.crud = crud
@@ -147,6 +245,10 @@ class Operation:
             raise e
 
     def checkObligatory(self):
+        """
+        Verifica que los datos obligatorios estén presentes en los datos proporcionados.
+        """
+
         miss = {}
         if self.crud == "SELECT":
             return False
@@ -168,7 +270,16 @@ class Operation:
         return False if len(miss) > 0 else miss
 
     # ! Not used
-    def parseJSON(self, data):
+    def parseJSON(self, data) -> dict:
+        """
+        Convierte los datos en formato JSON a un diccionario.
+
+        Args:
+            data (dict | str): Datos a convertir.
+
+        Returns:
+            dict: Diccionario con los datos.
+        """
         if isinstance(data, str) and self.crud == "SELECT":
             return json.loads(data)
         if isinstance(data, dict):
@@ -176,6 +287,9 @@ class Operation:
         raise ValueError("Data is not valid!")
 
     def getTables(self):
+        """
+        Obtiene las tablas de la base de datos a partir de los datos proporcionados.
+        """
         if isinstance(self.data, str):
             return
 
@@ -184,6 +298,16 @@ class Operation:
             self.tablesObj.append(Table(data, table.upper()))
 
     def orderTables(self, table: str):
+        """
+        Ordena las tablas de acuerdo a las dependencias entre ellas.
+
+        Args:
+            table (str): Nombre de la tabla.
+
+        Raises:
+            `ValueError`: Si una tabla o columna no existe en la base de datos.
+        """
+
         order = False
         tableObject: Table = self.tablesObj[self.tablesWaiting.index(table)]
         for column in tableObject.columns:
@@ -215,6 +339,14 @@ class Operation:
             self.tablesObj = newOrder
 
     def execute(self):
+        """	
+        Ejecuta la operación CRUD.
+
+        Raises:
+            `oracledb.DatabaseError`: Error al ejecutar la operación en la base de datos.
+            `ValueError`: Si una tabla o columna no existe en la base de datos.
+        """
+
         responses = {}
         try:
             if self.crud == "SELECT" and isinstance(self.data, str):
@@ -239,6 +371,16 @@ class Operation:
             raise e
 
     def checkValidation(self, tableClass: Table):
+        """
+        Verifica que las tablas y columnas proporcionadas existan en la base de datos.
+
+        Args:
+            tableClass (Table): Objeto `Table`.
+
+        Raises:
+            `ValueError`: Si una tabla o columna no existe en la base de datos.
+        """
+
         tableClass.toUpper()
         tables = tableClass.table
         columns = tableClass.columns
@@ -262,7 +404,20 @@ class Operation:
                         raise ValueError(
                             f"Column {columnName} not exist in table {tableName}!")
 
-    def getIDChild(self, nameColumn: str):
+    def getIDChild(self, nameColumn: str) -> int | None:
+        """
+        Obtiene el ID de la tabla hija.
+
+        Args:
+            nameColumn (str): Nombre de la columna.
+
+        Returns:
+            int | None: ID de la tabla hija.
+
+        Raises:
+            `oracledb.DatabaseError`: Error al ejecutar la operación.
+        """
+
         if nameColumn.find("CVE_") == -1:
             return None
 
@@ -276,6 +431,15 @@ class Operation:
             raise e
 
     def insert(self, table: Table):
+        """
+        Ejecuta la operación INSERT.
+
+        Args:
+            table (Table): Objeto `Table`.
+
+        Raises:
+            `oracledb.DatabaseError`: Error al ejecutar la operación en la base de datos.
+        """
         query = f"INSERT INTO SOFIDBA_02.{table.table}("
         valuesQuery = " VALUES("
         for column, values in zip(table.columns, table.values):
@@ -302,6 +466,18 @@ class Operation:
             raise e
 
     def update(self, table: Table):
+        """
+        Ejecuta la operación UPDATE.
+
+        Args:
+            table (Table): Objeto `Table`.
+
+        Returns:
+            int | str: Número de filas modificadas o mensaje de no modificación.
+
+        Raises:
+            `oracledb.DatabaseError`: Error al ejecutar la operación en la base de datos.
+        """
         query = f"UPDATE SOFIDBA_02.{table.table} SET "
         for column, values in zip(table.columns, table.values):
             if isinstance(values, str):
@@ -321,6 +497,15 @@ class Operation:
             raise e
 
     def delete(self, table: Table):
+        """
+        Ejecuta la operación DELETE.
+
+        Args:
+            table (Table): Objeto `Table`.
+
+        Raises:
+            `oracledb.DatabaseError`: Error al ejecutar la operación en la base de datos.
+        """
         query = f"DELETE FROM SOFIDBA_02.{table.table} WHERE {table.where}"
         try:
             print("Deleting...", end=" ")

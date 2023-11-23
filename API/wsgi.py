@@ -1,5 +1,9 @@
-from main import app
+"""
+Archivo para iniciar el servidor de Flask.
+Requerido por Gunicorn.
+"""
 import logging
+from main import app
 
 if __name__ == "__main__":
     gunicorn_logger = logging.getLogger('gunicorn.error')
