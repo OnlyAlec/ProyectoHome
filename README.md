@@ -57,5 +57,5 @@ SI quieres consultar el código de la **aplicación** desarrollada con Dart, ve 
 
 # Licencia
 
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE.md](https://chat.openai.com/c/LICENSE.md) para detalles.
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE.md](https://github.com/OnlyAlec/IoT-Home/blob/main/LICENSE) para detalles.
 
