@@ -183,8 +183,6 @@ if __name__ == '__main__':
 
     try:
         server = connectServer(host="200.10.0.18", port=8080)
-        # server = connectServer(host="200.10.0.15", port=8080)
-        # server = connectServer(host="192.168.151.1", port=8080)
         initStatusLED(None, 1)
     except (OSError) as e:
         LED_BICOLOR[1].value(0)
