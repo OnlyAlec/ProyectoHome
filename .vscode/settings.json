@@ -6,12 +6,10 @@
         "reportMissingModuleSource": "none"
     },
     "python.analysis.typeshedPaths": [
-        ".vscode/Pico-W-Stub",
-        ".vscode\\Pico-W-Stub"
+        "~/.micropico-stubs/included"
     ],
     "python.analysis.extraPaths": [
-        ".vscode/Pico-W-Stub",
-        ".vscode\\Pico-W-Stub"
+        "~/.micropico-stubs/included"
     ],
     "python.analysis.autoImportCompletions": true,
     "workbench.colorCustomizations": {
@@ -33,5 +31,10 @@
         "titleBar.inactiveBackground": "#a9f18699",
         "titleBar.inactiveForeground": "#15202b99"
     },
-    "peacock.color": "#a9f186"
+    "peacock.color": "#a9f186",
+    "idf.portWin": "COM18",
+    "idf.adapterTargetName": "esp32s3",
+    "idf.openOcdConfigs": [
+        "board/esp32s3-builtin.cfg"
+    ]
 }
